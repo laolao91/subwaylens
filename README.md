@@ -60,7 +60,7 @@ This is also a reference implementation for building Even Hub apps that combine 
 ### Install and run
 
 ```bash
-git clone https://github.com/laolao91/subwaylens.git
+git clone https://github.com/YOUR_USERNAME/subwaylens.git
 cd subwaylens
 npm install
 npm run dev
