@@ -12,11 +12,9 @@ Scroll between your favorite stations with the R1 ring. See the next trains in b
 |---|---|
 | ![74 St-Broadway](screenshots/glasses-74st-broadway.png) | ![Times Sq](screenshots/glasses-times-sq.png) |
 
-### Phone settings page
+### Phone settings page (v1.1.0)
 
-| Favorites & settings | Search & route badges |
-|---|---|
-| ![Settings](screenshots/settings-full-page.png) | ![Search](screenshots/settings-favorites-search.png) |
+![Settings](screenshots/settings-v1.1.0.png) 
 
 ## Try it on your G2 glasses
 
@@ -127,15 +125,19 @@ subwaylens/
   app.json                Even Hub app manifest
   src/
     main.ts               Boot logic, bridge detection, dual-mode routing
-    styles.css             Phone settings page styles (dark theme)
+    app.css                Even-toolkit light theme + Tailwind + MTA badges
     glasses/
       display.ts           Text rendering for the 576x288 glasses display
       input.ts             SDK event handling with quirk workarounds
       stations.ts          Station list manager (favorites + GPS nearby)
     settings/
-      settings-page.ts     Phone UI — search, favorites, settings controls
+      SettingsApp.tsx       React root — data loading, sections, sync, toast
+      FavoritesList.tsx     Drag-to-reorder (touch + mouse) + delete
+      StationSearch.tsx     Debounced search with route badges
+      SettingsPanel.tsx     Refresh interval, nearby toggle, radius
+      RouteBadge.tsx        MTA brand color badges
+      settings-mount.tsx    Bridges initSettingsPage() to React
       search.ts            Station search with common-name aliases
-      favorites.ts         Drag-to-reorder list (desktop + touch)
     data/
       mta-feeds.ts         GTFS-RT protobuf fetch and decode
       feed-urls.ts         MTA feed URL routing per line group
@@ -187,7 +189,7 @@ Please read [tests.md](tests.md) for known issues and [CHANGELOG.md](CHANGELOG.m
 
 This project follows [Semantic Versioning](https://semver.org/). See [VERSIONING.md](VERSIONING.md) for the full policy.
 
-Current version: **1.0.0**
+Current version: **1.1.0**
 
 ## License
 
