@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.1.0 — 2026-03-21
+
+Settings page redesign — replaced the vanilla DOM dark-themed settings page with React + even-toolkit components, matching the Even Realities 2025 UIUX Design Guidelines light theme.
+
+### What changed
+
+- **React settings page** — Rebuilt the entire phone settings UI as React components using the even-toolkit design system. Light theme (#EEEEEE background, #FFFFFF cards) replaces the previous dark theme.
+- **even-toolkit components** — Uses AppShell, ScreenHeader, Button, Toast, SegmentedControl, Toggle, SettingsGroup, EmptyState, and Input from even-toolkit/web.
+- **Touch drag-to-reorder preserved** — Favorites list supports drag reorder via touch events (handle drag + long-press) for the Even App WebView, plus mouse drag for desktop browsers.
+- **Visible delete button** — Each favorite has an x button for removal (works on desktop and mobile). Swipe-to-delete also works on mobile.
+- **MTA route badges** — Custom RouteBadge component preserves official MTA brand colors. Badges appear left of station name in search results, below station name in favorites.
+- **Toast notification** — "Send to Glasses" now shows a slide-up toast confirmation.
+- **Version number** — v1.1.0 shown in footer.
+- **Vite + React + Tailwind** — Added @vitejs/plugin-react, @tailwindcss/vite, and React 19. Vite downgraded from 7.x to 6.x for plugin compatibility.
+
+### What did NOT change
+
+All glasses display and data files are untouched:
+- src/glasses/display.ts, src/glasses/input.ts, src/glasses/stations.ts
+- src/data/mta-feeds.ts, src/data/feed-urls.ts, src/data/stations.json
+- src/lib/types.ts, src/lib/storage.ts, src/lib/time.ts, src/lib/geo.ts
+- src/main.ts — only change: import path updated from settings-page to settings-mount
+
+### Files added
+
+- src/settings/SettingsApp.tsx — React root component
+- src/settings/FavoritesList.tsx — Favorites with drag reorder + delete
+- src/settings/StationSearch.tsx — Debounced search with add-to-favorites
+- src/settings/SettingsPanel.tsx — Refresh interval, nearby toggle, nearby radius
+- src/settings/RouteBadge.tsx — MTA route color badges
+- src/settings/settings-mount.tsx — React mount bridge
+- src/app.css — even-toolkit light theme + Tailwind + MTA badges
+
+### Files removed
+
+- src/settings/settings-page.ts — replaced by SettingsApp.tsx
+- src/settings/favorites.ts — replaced by FavoritesList.tsx
+- src/styles.css — replaced by app.css
+
 ## v1.0.0 — 2026-03-15
 
 First release after UAT testing on simulator and real G2 hardware.

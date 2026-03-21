@@ -38,7 +38,7 @@ import {
 } from './glasses/display'
 import { setupInput } from './glasses/input'
 import { getSettings } from './lib/storage'
-import { initSettingsPage } from './settings/settings-page'
+import { initSettingsPage } from './settings/settings-mount'
 
 // ── Container IDs ──
 // containerName max 16 chars per SDK spec
