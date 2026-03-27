@@ -2,7 +2,7 @@
   "package_id": "com.subwaylens.app",
   "edition": "202603",
   "name": "SubwayLens",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "min_app_version": "0.1.0",
   "tagline": "MTA subway arrivals on your glasses",
   "description": "Real-time NYC subway arrival times on Even Realities G2 smart glasses. Scroll between favorited stations, see upcoming trains in both directions, and never miss a train again.",

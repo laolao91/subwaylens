@@ -56,17 +56,17 @@ export function StationSearch({ favoriteIds, onAdd }: StationSearchProps) {
             const isFav = favoriteIds.includes(station.id)
             return (
               <div key={station.id} className="flex items-center gap-3 bg-surface p-4">
-                <RouteBadges routes={station.routes} />
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] tracking-[-0.15px] text-text">{station.name}</div>
+                  <RouteBadges routes={station.routes} />
                 </div>
                 {isFav ? (
-                  <span className="shrink-0 text-text-dim text-[17px] w-8 text-center">&#x2713;</span>
+                  <span className="shrink-0 text-text-dim text-[17px] w-8 h-8 flex items-center justify-center">&#x2713;</span>
                 ) : (
                   <Button
                     variant="highlight"
                     size="icon"
-                    className="shrink-0"
+                    className="shrink-0 w-11 h-11"
                     onClick={() => onAdd(station.id)}
                     aria-label={`Add ${station.name}`}
                   >

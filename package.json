@@ -1,6 +1,6 @@
 {
   "name": "subwaylens",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "pack": "npm run build && evenhub pack app.json dist -o subwaylens.ehpk"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.7",
+    "@evenrealities/even_hub_sdk": "^0.0.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "even-toolkit": "^1.1.2",
@@ -21,7 +21,8 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
-    "@evenrealities/evenhub-cli": "^0.1.7",
+    "@evenrealities/evenhub-cli": "^0.1.10",
+    "@evenrealities/evenhub-simulator": "^0.6.2",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -30,6 +30,15 @@ body {
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-y: auto;
+  min-height: 100vh;
+}
+
+/* Ensure AppShell content area can scroll in WebView */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .route-badge {

@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.1.1 — 2026-03-27
+
+Bug fix release — addresses three issues discovered during real-device testing on iPhone in the Even App WebView. Also updates to latest SDK/CLI versions for Even Hub Early Developer Program compliance.
+
+### Bug fixes
+
+- **Search result layout clipping** — Fixed search results with many route badges (8+ badges) pushing the add button off the right edge of the screen. Station names and route badges now stack vertically (name on top, badges below) with the add button guaranteed to stay visible on the right side with a 44x44px minimum tap target. (`src/settings/StationSearch.tsx`)
+
+- **Settings section inaccessible** — Fixed page scroll issue where the Settings controls (refresh interval, nearby stations, nearby radius) were pushed below the viewport and unreachable. Added explicit scroll handling to ensure the entire page is scrollable in the Even App WebView. (`src/app.css`)
+
+- **Search too strict** — Added fuzzy matching to station search. Users can now find stations with natural search patterns that previously failed:
+  - Ordinal handling: "42nd" finds "42 St" stations
+  - Abbreviation normalization: "time square" finds "Times Sq-42 St", "lex" finds "Lexington Av/53 St", "herald square" finds "Herald Sq"
+  - Word-order tolerance: all query words must match but order doesn't matter
+  - Bidirectional abbreviations: st↔street, av↔ave↔avenue, sq↔square, blvd↔boulevard, pkwy↔parkway, ctr↔center↔centre, hts↔heights, jct↔junction
+  - Hyphens treated as spaces for matching
+  - Search aliases (WTC, Penn Station, Grand Central, etc.) still take priority
+  (`src/settings/search.ts`)
+
+### Dependency updates
+
+- **Even Hub SDK** — Updated to v0.0.9 (latest) for Even Hub Early Developer Program compliance
+  - New features: Launch source listening, 12 container limit (up from 4), 288x144 image sizes, IMU hardware control
+- **Even Hub CLI** — Updated to v0.1.10 (latest) for Even Hub Early Developer Program compliance
+- **Even Hub Simulator** — Added v0.6.2 dev dependency for local testing with latest SDK features
+- **Simulator requirement** — App verified on simulator v0.6.2
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `src/settings/StationSearch.tsx` | Vertical stacking layout for search results |
+| `src/app.css` | Scroll handling for WebView |
+| `src/settings/search.ts` | Fuzzy matching with abbreviation expansion |
+| `package.json` | Version 1.1.1 |
+| `app.json` | Version 1.1.1 |
+
 ## v1.1.0 — 2026-03-21
 
 Settings page redesign — replaced the vanilla DOM dark-themed settings page with React + even-toolkit components, matching the Even Realities 2025 UIUX Design Guidelines light theme.
