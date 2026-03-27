@@ -165,13 +165,13 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
             style={isBeingDragged ? { position: 'relative', zIndex: 1000 } : undefined}
           >
             <div className="flex items-center gap-3 bg-surface p-4">
-              <span
+              <div
                 data-drag-handle
-                className="text-text-dim text-[15px] cursor-grab select-none shrink-0"
+                className="text-text-dim text-[20px] cursor-grab select-none shrink-0 flex items-center justify-center w-10 h-10 -ml-2"
                 style={{ letterSpacing: '-2px', touchAction: 'none' }}
               >
                 &#x22EE;&#x22EE;
-              </span>
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] tracking-[-0.15px] text-text">{station.name}</div>
                 <RouteBadges routes={station.routes} />

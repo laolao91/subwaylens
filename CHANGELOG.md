@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.1 — 2026-03-27
+
+Bug fix release — improves drag-to-reorder UX and fixes missing borough code for Hudson Yards terminal.
+
+### Bug Fixes
+
+- **Improved drag handle for favorites reordering** — Increased drag handle size from 15px to 20px and expanded tap area to 40x40px (w-10 h-10) for easier grabbing and reordering on mobile. The larger hit box makes it much easier to initiate drag operations. (`src/settings/FavoritesList.tsx`)
+
+- **Fixed missing MAN code for Hudson Yards** — Added "34 St-Hudson Yards", "Hudson Yards", and "Hudson Yards-34 St" to the Manhattan borough mapping. The 7 train to Hudson Yards now correctly shows MAN on the glasses display. (`src/data/boroughs.ts`)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/settings/FavoritesList.tsx` | Larger drag handle (20px text, 40x40px tap area) |
+| `src/data/boroughs.ts` | Add Hudson Yards terminal variations |
+| `src/settings/SettingsApp.tsx` | Version 1.2.1 footer |
+| `package.json` | Version 1.2.1 |
+| `app.json` | Version 1.2.1 |
+
 ## v1.2.0 — 2026-03-27
 
 Feature release — adds borough direction indicators on glasses display, fixes persistent scroll issue from v1.1.1, and improves UX for station search and sync button.
