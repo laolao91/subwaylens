@@ -17,6 +17,7 @@
 
 import type { Station, StationArrivals, TrainArrival } from '../lib/types'
 import { formatArrival, isArrivingSoon } from '../lib/time'
+import { getBoroughCode } from '../data/boroughs'
 
 /** Max trains per direction to show */
 const MAX_TRAINS = 3
@@ -109,6 +110,13 @@ export function renderBody(
   const northTrains = arrivals.north.slice(0, MAX_TRAINS)
   const northLabel = directionLabel(northTrains, station.north)
   lines.push(`\u25B2 ${northLabel}`) // ▲ Direction
+  
+  // Add borough code if available
+  const northBorough = getBoroughCode(northLabel)
+  if (northBorough) {
+    lines.push(northBorough)
+  }
+  
   if (northTrains.length === 0) {
     lines.push('  No live data')
   } else {
@@ -124,6 +132,13 @@ export function renderBody(
   const southTrains = arrivals.south.slice(0, MAX_TRAINS)
   const southLabel = directionLabel(southTrains, station.south)
   lines.push(`\u25BC ${southLabel}`) // ▼ Direction
+  
+  // Add borough code if available
+  const southBorough = getBoroughCode(southLabel)
+  if (southBorough) {
+    lines.push(southBorough)
+  }
+  
   if (southTrains.length === 0) {
     lines.push('  No live data')
   } else {

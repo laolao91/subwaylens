@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.2.0 — 2026-03-27
+
+Feature release — adds borough direction indicators on glasses display, fixes persistent scroll issue from v1.1.1, and improves UX for station search and sync button.
+
+### New Features
+
+- **Borough direction codes** — Glasses display now shows 3-letter borough codes (MAN/QNS/BK/BX) on a separate line below each direction header (▲/▼). This helps users quickly understand where trains are heading without memorizing terminal names.
+  - Example display:
+    ```
+    ▼ Coney Island-Stillwell Av
+    BK
+     [D] Coney Island-Stillwell  4 min
+    ```
+  - Comprehensive terminal-to-borough mapping covers ~150 MTA terminals
+  - Shows for all terminals regardless of current borough
+  (`src/data/boroughs.ts`, `src/glasses/display.ts`)
+
+### Bug Fixes
+
+- **Fixed scroll issue (critical)** — The v1.1.1 scroll fix didn't work. Settings section was still inaccessible when favorites list was long. Root cause: `AppShell` component from even-toolkit doesn't handle scroll properly in the Even App WebView. **Solution:** Replaced `AppShell` with a simpler flex layout with explicit `overflow-y: auto` on the content area. Settings section is now always reachable regardless of favorites list length. (`src/settings/SettingsApp.tsx`)
+
+### UX Improvements
+
+- **"Send to Glasses" button repositioned** — Moved from top-right corner (easy to miss) to a prominent black button fixed at the bottom of the screen. More obvious and follows mobile app patterns for primary actions. (`src/settings/SettingsApp.tsx`)
+
+- **Auto-clear search after add** — Search input now clears automatically after adding a station to favorites. No more manual backspacing. (`src/settings/StationSearch.tsx`)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/settings/SettingsApp.tsx` | Removed AppShell, fixed scroll, repositioned sync button |
+| `src/settings/StationSearch.tsx` | Auto-clear search after add |
+| `src/data/boroughs.ts` | NEW - Terminal-to-borough mapping (150+ terminals) |
+| `src/glasses/display.ts` | Add borough codes below direction headers |
+| `package.json` | Version 1.2.0 |
+| `app.json` | Version 1.2.0 |
+
 ## v1.1.1 — 2026-03-27
 
 Bug fix release — addresses three issues discovered during real-device testing on iPhone in the Even App WebView. Also updates to latest SDK/CLI versions for Even Hub Early Developer Program compliance.

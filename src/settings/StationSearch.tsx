@@ -33,6 +33,13 @@ export function StationSearch({ favoriteIds, onAdd }: StationSearchProps) {
     []
   )
 
+  const handleAdd = useCallback((id: string) => {
+    onAdd(id)
+    // Clear search after adding
+    setQuery('')
+    setResults([])
+  }, [onAdd])
+
   return (
     <div>
       <Input
@@ -67,7 +74,7 @@ export function StationSearch({ favoriteIds, onAdd }: StationSearchProps) {
                     variant="highlight"
                     size="icon"
                     className="shrink-0 w-11 h-11"
-                    onClick={() => onAdd(station.id)}
+                    onClick={() => handleAdd(station.id)}
                     aria-label={`Add ${station.name}`}
                   >
                     +

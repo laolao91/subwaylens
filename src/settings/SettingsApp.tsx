@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  AppShell,
   ScreenHeader,
   Button,
   Toast,
@@ -87,26 +86,19 @@ export function SettingsApp() {
     )
   }
 
-  const header = (
-    <div className="px-3">
-      <ScreenHeader
-        title="SubwayLens"
-        subtitle="MTA Subway Arrivals for G2"
-      />
-    </div>
-  )
-
   return (
-    <AppShell header={header}>
-      <div className="px-3 pb-8">
-        <div className="flex items-center justify-between mb-3 mt-6">
-          <span className="text-[20px] tracking-[-0.6px] text-text" style={{ fontWeight: 500 }}>
-            My Stations
-          </span>
-          <Button variant="highlight" size="sm" onClick={handleSync}>
-            Send to Glasses
-          </Button>
-        </div>
+    <div className="min-h-dvh bg-bg flex flex-col">
+      {/* Header - sticky at top */}
+      <div className="sticky top-0 bg-bg z-10 px-3 pt-3 pb-2">
+        <ScreenHeader
+          title="SubwayLens"
+          subtitle="MTA Subway Arrivals for G2"
+        />
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-3 pb-24">
+        <SectionLabel>My Stations</SectionLabel>
         <FavoritesList
           favoriteIds={favoriteIds}
           onReorder={handleReorder}
@@ -126,15 +118,27 @@ export function SettingsApp() {
         />
 
         <p className="text-[11px] tracking-[-0.11px] text-text-dim text-center mt-8">
-          v1.1.1 &#x00B7; Changes auto-save. Tap &#x201C;Send to Glasses&#x201D; to update display.
+          v1.2.0 &#x00B7; Changes auto-save. Tap &#x201C;Send to Glasses&#x201D; to update display.
         </p>
       </div>
 
+      {/* Send to Glasses button - fixed at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-bg border-t border-border">
+        <Button 
+          variant="default" 
+          size="lg" 
+          className="w-full bg-text text-bg hover:bg-text/90"
+          onClick={handleSync}
+        >
+          Send to Glasses
+        </Button>
+      </div>
+
       {toastVisible && (
-        <div className={`fixed bottom-6 left-4 right-4 z-50 ${toastExiting ? 'toast-exit' : 'toast-enter'}`}>
+        <div className={`fixed bottom-24 left-4 right-4 z-50 ${toastExiting ? 'toast-exit' : 'toast-enter'}`}>
           <Toast message="Sent to glasses!" variant="info" />
         </div>
       )}
-    </AppShell>
+    </div>
   )
 }
