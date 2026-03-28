@@ -264,8 +264,12 @@ npm run pack  # Rebuild with network whitelist + location permission
 ### ✅ Item #4: Mobile UI Polish — COMPLETE
 Already using even-toolkit components
 
-### ⏳ Item #5: App Description — TO DO (Tomorrow)
-Maximum 2,000 characters for store listing
+### ⏳ Item #5: App Description — COMPLETE ✅
+**Maximum 2,000 characters for store listing**
+- **Status:** Draft 1 approved (1,738 characters)
+- **File:** `APP_DESCRIPTION.md`
+- **Style:** Concise & feature-focused
+- **Highlights:** Live MTA data, borough codes, nearby stations, privacy-first, no backend
 
 ### ⏳ Item #6: Privacy & Permissions — TO DO (Tomorrow)
 **Updated with complete permissions manifest:**
@@ -297,27 +301,21 @@ Maximum 2,000 characters for store listing
 
 ---
 
-## Tomorrow's Agenda (Unchanged)
+## Tomorrow's Agenda
 
 1. **Generate store screenshots** using simulator v0.6.2
-   - Station list view
-   - Arrivals display with borough codes
-   - Settings page
-   - Nearby stations feature
+   - Screenshot #1: Hero Shot — Times Square arrivals
+   - Screenshot #2: Borough codes feature
+   - Screenshot #3: Phone settings page — search & favorites
+   - Screenshot #4 (optional): Nearby stations
+   - Screenshot #5 (optional): Multi-station navigation
 
-2. **Draft app description** (max 2,000 characters)
-   - Highlight key features
-   - Emphasize real-time MTA data
-   - Explain borough codes benefit
-   - Mention NYC subway rider focus
+2. **Document privacy & permissions** ✅ COMPLETE (permissions declared in app.json)
+   - **Network:** `https://api-endpoint.mta.info` (whitelisted) ✅
+   - **Location:** GPS for nearby stations ✅
+   - Draft privacy statement for store (data collection disclosure)
 
-3. **Document privacy & permissions**
-   - **Network:** `https://api-endpoint.mta.info` (whitelisted) ✅ COMPLETE
-   - **Location:** GPS for nearby stations ✅ COMPLETE
-   - **Data collected:** Favorites, settings, GPS
-   - **Data NOT collected:** No accounts, no tracking
-
-4. **Draw app icon** in Even Hub Dev Portal (when access granted)
+3. **Draw app icon** in Even Hub Dev Portal (when access granted)
    - MTA arrivals board design
    - Test 2x2 pixel grid constraints
 
