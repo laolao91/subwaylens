@@ -271,12 +271,18 @@ Already using even-toolkit components
 - **Style:** Concise & feature-focused
 - **Highlights:** Live MTA data, borough codes, nearby stations, privacy-first, no backend
 
-### ⏳ Item #6: Privacy & Permissions — TO DO (Tomorrow)
-**Updated with complete permissions manifest:**
-- **Network permission:** Access to `https://api-endpoint.mta.info` only (whitelisted) ✅
-- **Location permission:** GPS for nearby stations (when enabled in settings) ✅
-- **Data collected:** Favorite stations (local storage), settings, GPS (when nearby enabled)
-- **Data NOT collected:** No accounts, no personal info, no analytics
+### ✅ Item #6: Privacy & Permissions — COMPLETE ✅ **NEW!**
+**OS Permissions declared in app.json:**
+- Network permission with whitelist ✅
+- Location permission ✅
+
+**Privacy documentation:**
+- **File:** `PRIVACY.md` (comprehensive policy for GitHub users)
+- **File:** `PRIVACY_SUBMISSION.md` (condensed version for Even Hub form)
+- **Data collected:** Favorites, settings (local storage only), GPS (transient, not stored)
+- **Data NOT collected:** No accounts, no tracking, no analytics, no personal info
+- **Third parties:** Only MTA public feeds (api-endpoint.mta.info)
+- **Open source:** GPLv3 licensed, full transparency
 
 ---
 
@@ -301,7 +307,7 @@ Already using even-toolkit components
 
 ---
 
-## Tomorrow's Agenda
+## Next Steps
 
 1. **Generate store screenshots** using simulator v0.6.2
    - Screenshot #1: Hero Shot — Times Square arrivals
@@ -310,12 +316,7 @@ Already using even-toolkit components
    - Screenshot #4 (optional): Nearby stations
    - Screenshot #5 (optional): Multi-station navigation
 
-2. **Document privacy & permissions** ✅ COMPLETE (permissions declared in app.json)
-   - **Network:** `https://api-endpoint.mta.info` (whitelisted) ✅
-   - **Location:** GPS for nearby stations ✅
-   - Draft privacy statement for store (data collection disclosure)
-
-3. **Draw app icon** in Even Hub Dev Portal (when access granted)
+2. **Draw app icon** in Even Hub Dev Portal (when access granted)
    - MTA arrivals board design
    - Test 2x2 pixel grid constraints
 
@@ -324,14 +325,23 @@ Already using even-toolkit components
 ## Current State Summary
 
 **Version:** v1.2.3
-**Status:** Ready for Even Hub submission (after package rebuild)
-**GitHub:** v1.2.2 pushed, v1.2.3 ready to push
-**Local:** `/Users/stevenlao/SubwayLens3_27_2026/` (needs `git pull` for v1.2.3)
+**Status:** Ready for Even Hub submission (screenshots + icon remaining)
+**GitHub:** All changes pushed, fully documented
+**Local:** `/Users/stevenlao/SubwayLens3_27_2026/` (needs `git pull` for latest)
 **Package:** Needs rebuild with `npm run pack` for v1.2.3
 **Live deployment:** https://subwaylens.vercel.app (auto-deploys from GitHub)
 
-**Compliance:** ✅ Fully compliant with Even Hub official documentation best practices
-**Permissions:** ✅ Network (whitelisted) + Location declared
+**Compliance:** ✅ Fully compliant with Even Hub official documentation best practices  
+**Permissions:** ✅ Network (whitelisted) + Location declared  
+**Documentation:** ✅ App description, privacy policy, screenshot plan all ready  
+
+**Submission Checklist Progress: 4/6 Complete**
+- ✅ SDK/CLI/Package verification
+- 📋 App icon (waiting for Dev Portal access)
+- ⏳ Store screenshots (plan ready, need to capture)
+- ✅ Mobile UI polish
+- ✅ App description
+- ✅ Privacy & permissions documentation
 
 ---
 
