@@ -90,6 +90,66 @@ Configuration improvement — adds network permission whitelist for enhanced sec
 
 ---
 
+## v1.2.3 Release
+
+### Issue Discovered
+Immediately after completing v1.2.2, Steven identified that the app uses GPS (`navigator.geolocation.getCurrentPosition()` in `src/lib/geo.ts` line 61) for the "Show nearby stations" feature but had no `location` permission declared in `app.json`. This violates Even Hub best practices — all browser APIs that require user permission must be declared in the app manifest.
+
+### Classification
+**Patch release** — Adds missing location permission. Configuration-only change (no code modified).
+
+### Changes Made
+
+**File: app.json**
+```json
+"permissions": [
+  {
+    "name": "network",
+    "desc": "Access MTA real-time subway data feeds to display live train arrival times",
+    "whitelist": ["https://api-endpoint.mta.info"]
+  },
+  {
+    "name": "location",  // ← ADDED
+    "desc": "Find nearby subway stations when 'Show nearby stations' is enabled in settings"
+  }
+]
+```
+
+**Updated version to 1.2.3 in:**
+- `app.json` → "version": "1.2.3"
+- `package.json` → "version": "1.2.3"
+
+**Updated README.md:**
+- Current version: 1.1.0 → 1.2.3 (line 192)
+- Screenshot caption: "Phone settings page (v1.1.0)" → "Phone settings page" (removed version-specific label)
+- SDK notes section updated:
+  - Removed outdated `borderRdaius` note (SDK 0.0.9 fixed the typo)
+  - Added note about SDK 0.0.9 correcting borderRadius spelling
+  - Added note about requiring explicit permissions in app.json
+
+**Added CHANGELOG.md entry:**
+```markdown
+## v1.2.3 — 2026-03-28
+
+Configuration improvement — adds location permission for GPS nearby stations feature.
+```
+
+---
+
+## Files Modified (Combined v1.2.2 + v1.2.3)
+
+**Total:** 5 files
+
+| File | v1.2.2 Changes | v1.2.3 Changes |
+|------|---------------|---------------|
+| `app.json` | Added network whitelist, version 1.2.2 | Added location permission, version 1.2.3 |
+| `package.json` | Version 1.2.2 | Version 1.2.3 |
+| `CHANGELOG.md` | Added v1.2.2 section | Added v1.2.3 section |
+| `README.md` | — | Updated version to 1.2.3, updated SDK notes, removed version-specific screenshot label |
+| `PROJECT_JOURNAL_2026-03-28.md` | Created initial journal | Updated with v1.2.3 information |
+
+---
+
 ## Files Modified
 
 **Total:** 3 files
@@ -138,9 +198,14 @@ Configuration improvement — adds network permission whitelist for enhanced sec
 1. `feat: v1.2.2 add network permission whitelist per Even Hub best practices`
    - Modified: app.json, package.json, CHANGELOG.md
    - Added: PROJECT_JOURNAL_2026-03-28.md
+   - Tag: v1.2.2
+
+2. `feat: v1.2.3 add location permission for GPS nearby stations`
+   - Modified: app.json, package.json, CHANGELOG.md, README.md, PROJECT_JOURNAL_2026-03-28.md
+   - Tag: v1.2.3 (pending)
 
 **Branch:** main
-**Status:** Committed locally, pushed to GitHub
+**Status:** v1.2.2 pushed to GitHub, v1.2.3 ready to commit
 
 **Git sync:**
 ```bash
@@ -160,9 +225,9 @@ git pull origin main
 ```
 
 **This is the MASTER directory containing:**
-- ✅ Source code (v1.2.2 after pull)
+- ✅ Source code (v1.2.3 after pull)
 - ✅ All dependencies installed (SDK 0.0.9, CLI 0.1.10, Simulator 0.6.2)
-- ✅ Submission package: `subwaylens.ehpk` (from v1.2.1, needs rebuild for v1.2.2)
+- ✅ Submission package: `subwaylens.ehpk` (from v1.2.1, needs rebuild for v1.2.3)
 - ✅ Clean 1:1 GitHub sync
 
 **GitHub Repository:**
@@ -170,11 +235,11 @@ git pull origin main
 https://github.com/laolao91/subwaylens
 ```
 
-**To sync v1.2.2 to local directory:**
+**To sync v1.2.3 to local directory:**
 ```bash
 cd /Users/stevenlao/SubwayLens3_27_2026
 git pull origin main
-npm run pack  # Rebuild with whitelist
+npm run pack  # Rebuild with network whitelist + location permission
 ```
 
 ---
@@ -185,8 +250,8 @@ npm run pack  # Rebuild with whitelist
 - SDK: v0.0.9 ✅
 - CLI: v0.1.10 ✅
 - Simulator: v0.6.2 ✅
-- app.json: Strictly formatted, valid JSON, **now includes network whitelist** ✅
-- Package: Needs rebuild with `npm run pack` for v1.2.2
+- app.json: Strictly formatted, valid JSON, **now includes network whitelist + location permission** ✅
+- Package: Needs rebuild with `npm run pack` for v1.2.3
 
 ### 📋 Item #2: App Icon Design — PLANNED
 - **Design concept:** MTA arrivals board (Times Square style)
@@ -203,8 +268,9 @@ Already using even-toolkit components
 Maximum 2,000 characters for store listing
 
 ### ⏳ Item #6: Privacy & Permissions — TO DO (Tomorrow)
-**Updated with whitelist:**
-- **Network permission:** Access to `https://api-endpoint.mta.info` only (whitelisted)
+**Updated with complete permissions manifest:**
+- **Network permission:** Access to `https://api-endpoint.mta.info` only (whitelisted) ✅
+- **Location permission:** GPS for nearby stations (when enabled in settings) ✅
 - **Data collected:** Favorite stations (local storage), settings, GPS (when nearby enabled)
 - **Data NOT collected:** No accounts, no personal info, no analytics
 
@@ -246,7 +312,8 @@ Maximum 2,000 characters for store listing
    - Mention NYC subway rider focus
 
 3. **Document privacy & permissions**
-   - **Network:** `https://api-endpoint.mta.info` (whitelisted) ✅ UPDATED
+   - **Network:** `https://api-endpoint.mta.info` (whitelisted) ✅ COMPLETE
+   - **Location:** GPS for nearby stations ✅ COMPLETE
    - **Data collected:** Favorites, settings, GPS
    - **Data NOT collected:** No accounts, no tracking
 
@@ -258,14 +325,15 @@ Maximum 2,000 characters for store listing
 
 ## Current State Summary
 
-**Version:** v1.2.2
+**Version:** v1.2.3
 **Status:** Ready for Even Hub submission (after package rebuild)
-**GitHub:** Changes committed, ready to push
-**Local:** `/Users/stevenlao/SubwayLens3_27_2026/` (needs `git pull` for v1.2.2)
-**Package:** Needs rebuild with `npm run pack` for v1.2.2
+**GitHub:** v1.2.2 pushed, v1.2.3 ready to push
+**Local:** `/Users/stevenlao/SubwayLens3_27_2026/` (needs `git pull` for v1.2.3)
+**Package:** Needs rebuild with `npm run pack` for v1.2.3
 **Live deployment:** https://subwaylens.vercel.app (auto-deploys from GitHub)
 
 **Compliance:** ✅ Fully compliant with Even Hub official documentation best practices
+**Permissions:** ✅ Network (whitelisted) + Location declared
 
 ---
 

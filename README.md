@@ -12,7 +12,7 @@ Scroll between your favorite stations with the R1 ring. See the next trains in b
 |---|---|
 | ![74 St-Broadway](screenshots/glasses-74st-broadway.png) | ![Times Sq](screenshots/glasses-times-sq.png) |
 
-### Phone settings page (v1.1.0)
+### Phone settings page
 
 ![Settings](screenshots/settings-v1.1.0.png) 
 
@@ -155,7 +155,8 @@ If you're building your own G2 app, here are the key lessons from this project:
 
 - **Bridge detection:** The SDK injects `EvenAppBridge` in all environments. Check for `window.flutter_inappwebview` to detect the real Even App vs a regular browser.
 - **Dual mode:** Always show a settings UI on the phone AND send display data to the glasses. Don't make them mutually exclusive.
-- **`borderRdaius`:** This is an intentional typo in the SDK's protobuf — don't "fix" it.
+- **SDK 0.0.9 update:** Earlier SDK versions used `borderRdaius` (typo). SDK 0.0.9+ corrected this to `borderRadius`. Use the correct spelling for SDK 0.0.9+.
+- **Permissions manifest:** Always declare `network` (with whitelist), `location`, or other permissions in `app.json` even if the browser APIs work without them. Even Hub requires explicit permission declarations.
 - **`CLICK_EVENT = 0`:** The SDK's `fromJson` normalizes `0` to `undefined`. Always check `eventType === OsEventTypeList.CLICK_EVENT || eventType === undefined`.
 - **Scroll events are boundary events:** `SCROLL_TOP_EVENT` and `SCROLL_BOTTOM_EVENT` fire when internal scroll hits the edge, not on every gesture. Use a 300ms cooldown.
 - **Touch events in WebView:** HTML5 Drag and Drop doesn't work in mobile WebViews. Use `touchstart`/`touchmove`/`touchend` for drag-to-reorder.
@@ -189,7 +190,7 @@ Please read [tests.md](tests.md) for known issues and [CHANGELOG.md](CHANGELOG.m
 
 This project follows [Semantic Versioning](https://semver.org/). See [VERSIONING.md](VERSIONING.md) for the full policy.
 
-Current version: **1.1.0**
+Current version: **1.2.3**
 
 ## License
 

@@ -2,7 +2,7 @@
   "package_id": "com.subwaylens.app",
   "edition": "202601",
   "name": "SubwayLens",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "min_app_version": "0.1.0",
   "min_sdk_version": "0.0.9",
   "tagline": "MTA subway arrivals on your glasses",
@@ -14,6 +14,10 @@
       "name": "network",
       "desc": "Access MTA real-time subway data feeds to display live train arrival times",
       "whitelist": ["https://api-endpoint.mta.info"]
+    },
+    {
+      "name": "location",
+      "desc": "Find nearby subway stations when 'Show nearby stations' is enabled in settings"
     }
   ],
   "supported_languages": ["en"]

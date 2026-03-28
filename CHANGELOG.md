@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.2.3 — 2026-03-28
+
+Configuration improvement — adds location permission for GPS nearby stations feature.
+
+### Configuration
+
+- **Added location permission** — The `permissions` array in `app.json` now includes a `location` permission to enable the "Show nearby stations" feature. The app uses `navigator.geolocation.getCurrentPosition()` when this setting is enabled, so declaring the permission is required by Even Hub best practices. (`app.json`)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `app.json` | Add location permission (v1.2.3) |
+| `package.json` | Version 1.2.3 |
+| `README.md` | Update current version to 1.2.3, update SDK notes |
+
 ## v1.2.2 — 2026-03-28
 
 Configuration improvement — adds network permission whitelist for enhanced security as per Even Hub best practices.
