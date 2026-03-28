@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.2.2 — 2026-03-28
+
+Configuration improvement — adds network permission whitelist for enhanced security as per Even Hub best practices.
+
+### Configuration
+
+- **Added network permission whitelist** — The `network` permission in `app.json` now includes a `whitelist` array restricting network access to only `https://api-endpoint.mta.info`. This follows Even Hub official documentation best practices for security by explicitly limiting which domains the app can access. No code changes required. (`app.json`)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `app.json` | Add whitelist to network permission (v1.2.2) |
+| `package.json` | Version 1.2.2 |
+
 ## v1.2.1 — 2026-03-27
 
 Bug fix release — improves drag-to-reorder UX and fixes missing borough code for Hudson Yards terminal.
