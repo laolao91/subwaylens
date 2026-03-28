@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.3.0 — 2026-03-28
+
+Feature release — implements the nearby stations display on the phone settings page.
+
+### New Features
+
+- **Nearby stations UI** — When "Show nearby stations" is enabled in Settings, the phone settings page now detects your GPS location and displays stations within your configured radius. Each station shows its name, distance (e.g., "0.12 mi"), route badges, and a + button to add to favorites. Previously, the toggle existed and the glasses-side logic worked, but the settings page had no UI to show results. (`src/settings/NearbyStations.tsx`, `src/settings/SettingsApp.tsx`)
+
+### States handled
+
+- **Loading** — "Detecting location..." while GPS resolves
+- **Denied** — Message with instructions to enable location + Retry button
+- **Unavailable** — Message when device has no location services
+- **No results** — Message suggesting increasing the nearby radius
+- **Results** — Station list sorted by distance with add-to-favorites support
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/settings/NearbyStations.tsx` | New component — GPS detection + nearby station display |
+| `src/settings/SettingsApp.tsx` | Added Nearby Stations section, version footer 1.3.0 |
+| `package.json` | Version 1.3.0 |
+| `app.json` | Version 1.3.0 |
+
 ## v1.2.3 — 2026-03-28
 
 Configuration improvement — adds location permission for GPS nearby stations feature.
