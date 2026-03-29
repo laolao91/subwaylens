@@ -27,7 +27,7 @@ Or open this URL in the Even App: **https://subwaylens.vercel.app/**
 ## What it does
 
 - **Glasses:** Shows real-time subway arrivals for your favorited stations. Scroll between stations, tap to refresh, double-tap to exit.
-- **Phone:** Settings page inside the Even App for searching 470+ MTA stations, adding/removing/reordering favorites, and adjusting refresh interval and nearby station detection.
+- **Phone:** Settings page inside the Even App for searching 470+ MTA stations, adding/removing/reordering favorites, viewing GPS-detected nearby stations with distance, and adjusting refresh interval and nearby station detection.
 - **Live data:** Fetches MTA GTFS-RT protobuf feeds directly — no backend server, no API key required.
 - **No fake data:** When MTA feeds are unreachable, the display shows "No live data" rather than made-up times. You always know what you're seeing is real.
 
@@ -133,6 +133,7 @@ subwaylens/
     settings/
       SettingsApp.tsx       React root — data loading, sections, sync, toast
       FavoritesList.tsx     Drag-to-reorder (touch + mouse) + delete
+      NearbyStations.tsx    GPS-detected nearby stations with distance
       StationSearch.tsx     Debounced search with route badges
       SettingsPanel.tsx     Refresh interval, nearby toggle, radius
       RouteBadge.tsx        MTA brand color badges
@@ -190,7 +191,7 @@ Please read [tests.md](tests.md) for known issues and [CHANGELOG.md](CHANGELOG.m
 
 This project follows [Semantic Versioning](https://semver.org/). See [VERSIONING.md](VERSIONING.md) for the full policy.
 
-Current version: **1.2.3**
+Current version: **1.3.0**
 
 ## License
 

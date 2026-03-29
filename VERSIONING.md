@@ -53,4 +53,11 @@ For testing builds before a release, use pre-release identifiers:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3.0 | 2026-03-28 | Nearby stations display on phone settings page with GPS detection, distance, and add-to-favorites. |
+| 1.2.3 | 2026-03-28 | Added location permission to app.json. |
+| 1.2.2 | 2026-03-28 | Added network permission whitelist to app.json. |
+| 1.2.1 | 2026-03-27 | Larger drag handle, Hudson Yards borough code fix. |
+| 1.2.0 | 2026-03-27 | Borough direction codes on glasses, scroll fix, UX improvements. |
+| 1.1.1 | 2026-03-27 | SDK 0.0.9 compliance, scroll fix attempt, search improvements. |
+| 1.1.0 | 2026-03-21 | Settings page redesign with React + even-toolkit light theme. |
 | 1.0.0 | 2026-03-15 | Initial release after UAT. 6 bug fixes, search aliases, sync button, touch drag, real MTA terminal names. |
