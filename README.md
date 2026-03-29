@@ -8,13 +8,15 @@ Scroll between your favorite stations with the R1 ring. See the next trains in b
 
 ### Glasses display — real-time arrivals
 
-| 74 St-Broadway (Jackson Heights) | Times Sq-42 St |
+| Times Sq-42 St | Chambers St |
 |---|---|
-| ![74 St-Broadway](screenshots/glasses-74st-broadway.png) | ![Times Sq](screenshots/glasses-times-sq.png) |
+| ![Times Sq](screenshots/glasses-times-sq-arrivals.png) | ![Chambers St](screenshots/glasses-chambers-st-arrivals.png) |
 
 ### Phone settings page
 
-![Settings](screenshots/settings-v1.1.0.png) 
+| Favorites + Nearby Stations | Settings + Controls |
+|---|---|
+| ![Favorites](screenshots/settings-favorites-nearby.png) | ![Settings](screenshots/settings-nearby-controls.png) |
 
 ## Try it on your G2 glasses
 

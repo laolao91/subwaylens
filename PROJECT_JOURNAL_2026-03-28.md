@@ -338,7 +338,88 @@ Already using even-toolkit components
 **Submission Checklist Progress: 4/6 Complete**
 - ✅ SDK/CLI/Package verification
 - 📋 App icon (waiting for Dev Portal access)
-- ⏳ Store screenshots (plan ready, need to capture)
+- ✅ Store screenshots — COMPLETE
+- ✅ Mobile UI polish
+- ✅ App description
+- ✅ Privacy & permissions documentation
+
+---
+
+## Session 2: v1.3.0 — Nearby Stations Display
+
+### Problem
+
+The "Show nearby stations" toggle existed in settings and the location permission was declared, but NO stations were displayed when enabled on the phone settings page. The glasses-side logic in `stations.ts` properly called `getCurrentPosition()` and `nearbyStations()`, but the phone settings UI had zero code to detect or display nearby stations. The toggle flipped a boolean that only the glasses side read.
+
+### Diagnosis
+
+1. GPS permission granted — `navigator.geolocation.getCurrentPosition()` worked
+2. Nearby calculation worked — manual console test returned nearby stations
+3. `grep -i "nearbyEnabled" src/settings/StationSearch.tsx` → nothing found
+4. `grep -i "nearby" src/settings/StationSearch.tsx` → nothing found
+
+**Root cause:** The nearby stations display feature was never implemented in the React settings page.
+
+### Solution
+
+Created `NearbyStations.tsx` component that:
+- Calls `getCurrentPosition()` + `nearbyStations()` from `geo.ts` when enabled
+- Displays found stations with name, distance (e.g., "0.12 mi"), route badges, and + button to add to favorites
+- Handles all states: loading GPS, location denied (with Retry button), unavailable, no results, results
+- Section conditionally shown only when "Show nearby stations" toggle is on
+- Re-detects when radius changes or toggle flips
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/settings/NearbyStations.tsx` | **New** — 145-line GPS nearby stations component |
+| `src/settings/SettingsApp.tsx` | Added import + conditional Nearby Stations section, version footer v1.3.0 |
+| `package.json` | Version 1.3.0 |
+| `app.json` | Version 1.3.0 |
+| `CHANGELOG.md` | Full v1.3.0 entry |
+| `README.md` | Version 1.3.0, added NearbyStations.tsx to project structure, updated feature description |
+| `VERSIONING.md` | Full version history table (v1.0.0 through v1.3.0) |
+
+### Files NOT Changed
+
+All glasses code, `main.ts`, `geo.ts`, `mta-feeds.ts`, `stations.json`, `boroughs.ts`, `storage.ts`, `search.ts`, all other settings components.
+
+### Screenshots Updated
+
+Old v1.1.0 screenshots removed, replaced with v1.3.0 captures:
+
+| File | Content |
+|------|---------|
+| `glasses-times-sq-arrivals.png` | Times Sq-42 St with live arrivals + borough codes |
+| `glasses-chambers-st-arrivals.png` | Chambers St with progress bar (2/5) |
+| `settings-favorites-nearby.png` | My Stations + Nearby Stations section |
+| `settings-nearby-controls.png` | Nearby stations + settings controls + v1.3.0 footer |
+| `qr-code.png` | Unchanged |
+
+### Testing
+
+- Verified in simulator v0.6.2 — glasses display works, station cycling, live MTA data
+- Nearby stations feature tested in browser — GPS detection, station list with distances, add-to-favorites
+- Location denied state confirmed and Retry button works
+- TypeScript clean, Vite build passes (780 modules)
+
+### Local Directory
+
+```
+~/EvenHub_Developer_Submissions/SubwayLens_v1.3.0/
+```
+
+(Renamed from spaces to underscores for shell compatibility)
+
+---
+
+## Even Hub Submission Checklist (Final)
+
+**Submission Checklist Progress: 5/6 Complete**
+- ✅ SDK/CLI/Package verification
+- 📋 App icon (waiting for Dev Portal access)
+- ✅ Store screenshots — 2 glasses + 2 settings + QR code
 - ✅ Mobile UI polish
 - ✅ App description
 - ✅ Privacy & permissions documentation
