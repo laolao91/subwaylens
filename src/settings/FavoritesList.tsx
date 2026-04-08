@@ -159,7 +159,7 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
           <div
             key={id}
             data-fav-idx={visualIdx}
-            className={`drag-item ${isBeingDragged ? 'dragging' : ''}`}
+            className={`drag-item ${isBeingDragged ? 'dragging' : ''} border-b border-border last:border-b-0`}
             onTouchStart={(e) => onTouchStart(e, originalIdx)}
             onMouseDown={(e) => onMouseDown(e, originalIdx)}
             style={isBeingDragged ? { position: 'relative', zIndex: 1000 } : undefined}

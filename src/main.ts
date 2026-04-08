@@ -35,6 +35,7 @@ import {
   renderBody,
   renderLoading,
   renderNoStations,
+  renderExitConfirm,
 } from './glasses/display'
 import { setupInput } from './glasses/input'
 import { getSettings } from './lib/storage'
@@ -50,13 +51,24 @@ const BODY_NAME = 'body'
 let bridge: EvenAppBridge | null = null
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
+// ── Exit confirmation state ──
+// Double-tap shows a confirmation screen; a second double-tap within
+// EXIT_CONFIRM_MS exits the app. Any scroll or tap cancels.
+const EXIT_CONFIRM_MS = 3000
+let exitConfirmPending = false
+let exitConfirmTimer: ReturnType<typeof setTimeout> | null = null
+let lastBodyText = ''
+
+function clearExitConfirm(): void {
+  exitConfirmPending = false
+  if (exitConfirmTimer) {
+    clearTimeout(exitConfirmTimer)
+    exitConfirmTimer = null
+  }
+}
+
 // ── Glasses display helpers ──
 
-/**
- * Create the initial two-container page layout.
- * Header: station name + star (small strip at top).
- * Body: directions, trains, progress bar (fills rest of screen).
- */
 async function createInitialPage(
   headerText: string,
   bodyText: string
@@ -105,9 +117,6 @@ async function createInitialPage(
   }
 }
 
-/**
- * Full page rebuild (used when switching stations).
- */
 async function rebuildPage(
   headerText: string,
   bodyText: string
@@ -152,9 +161,6 @@ async function rebuildPage(
   )
 }
 
-/**
- * Update just the body text (smooth, no flicker on real hardware).
- */
 async function updateBody(text: string): Promise<void> {
   if (!bridge) return
   await bridge.textContainerUpgrade(
@@ -162,15 +168,12 @@ async function updateBody(text: string): Promise<void> {
       containerID: BODY_ID,
       containerName: BODY_NAME,
       contentOffset: 0,
-      contentLength: 2000, // max allowed by textContainerUpgrade
+      contentLength: 2000,
       content: text,
     })
   )
 }
 
-/**
- * Update just the header text.
- */
 async function updateHeader(text: string): Promise<void> {
   if (!bridge) return
   await bridge.textContainerUpgrade(
@@ -186,9 +189,6 @@ async function updateHeader(text: string): Promise<void> {
 
 // ── Display update logic ──
 
-/**
- * Refresh and display the current station's arrivals.
- */
 async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   const station = currentStation()
   const { stations, currentIndex } = getState()
@@ -205,7 +205,6 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
 
   const headerText = renderHeader(station, isFavorite(station.id))
 
-  // Show loading state
   if (useRebuild) {
     await rebuildPage(headerText, renderLoading())
   } else {
@@ -213,17 +212,14 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     await updateBody(renderLoading())
   }
 
-  // Fetch arrivals
   const arrivals = await refreshCurrentArrivals()
   if (!arrivals) return
 
   const bodyText = renderBody(station, arrivals, currentIndex, stations.length)
+  lastBodyText = bodyText
   await updateBody(bodyText)
 }
 
-/**
- * Refresh in-place (no rebuild, just update body text).
- */
 async function refreshInPlace(): Promise<void> {
   const station = currentStation()
   if (!station) return
@@ -233,7 +229,16 @@ async function refreshInPlace(): Promise<void> {
 
   const { stations, currentIndex } = getState()
   const bodyText = renderBody(station, arrivals, currentIndex, stations.length)
+  lastBodyText = bodyText
   await updateBody(bodyText)
+}
+
+async function restoreNormalDisplay(): Promise<void> {
+  if (lastBodyText) {
+    await updateBody(lastBodyText)
+  } else {
+    await refreshInPlace()
+  }
 }
 
 // ── Auto-refresh ──
@@ -242,7 +247,9 @@ async function startAutoRefresh(): Promise<void> {
   stopAutoRefresh()
   const settings = await getSettings()
   refreshTimer = setInterval(() => {
-    refreshInPlace()
+    if (!exitConfirmPending) {
+      refreshInPlace()
+    }
   }, settings.refreshInterval * 1000)
 }
 
@@ -260,10 +267,8 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
   initStorage(b)
 
-  // Load station list (favorites + nearby)
   await loadStations()
 
-  // Create initial page
   const station = currentStation()
   if (station) {
     await createInitialPage(
@@ -274,49 +279,70 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
     await createInitialPage('SubwayLens', renderNoStations())
   }
 
-  // Fetch and display arrivals
   if (station) {
     const arrivals = await refreshCurrentArrivals()
     if (arrivals) {
       const { stations, currentIndex } = getState()
-      await updateBody(
-        renderBody(station, arrivals, currentIndex, stations.length)
-      )
+      const bodyText = renderBody(station, arrivals, currentIndex, stations.length)
+      lastBodyText = bodyText
+      await updateBody(bodyText)
     }
   }
 
-  // Set up input handling
   setupInput(b, {
-    onScrollDown: () => {
+    onScrollDown: async () => {
+      if (exitConfirmPending) {
+        clearExitConfirm()
+        await restoreNormalDisplay()
+        return
+      }
       nextStation()
-      displayCurrentStation(true) // rebuild for station switch
+      displayCurrentStation(true)
     },
-    onScrollUp: () => {
+    onScrollUp: async () => {
+      if (exitConfirmPending) {
+        clearExitConfirm()
+        await restoreNormalDisplay()
+        return
+      }
       prevStation()
       displayCurrentStation(true)
     },
-    onTap: () => {
-      refreshInPlace() // manual refresh
+    onTap: async () => {
+      if (exitConfirmPending) {
+        clearExitConfirm()
+        await restoreNormalDisplay()
+        return
+      }
+      refreshInPlace()
     },
     onDoubleTap: async () => {
-      // Exit app
-      stopAutoRefresh()
-      await b.shutDownPageContainer(0)
+      if (exitConfirmPending) {
+        clearExitConfirm()
+        stopAutoRefresh()
+        await b.shutDownPageContainer(0)
+      } else {
+        exitConfirmPending = true
+        await updateBody(renderExitConfirm())
+        exitConfirmTimer = setTimeout(async () => {
+          exitConfirmPending = false
+          exitConfirmTimer = null
+          await restoreNormalDisplay()
+        }, EXIT_CONFIRM_MS)
+      }
     },
     onForegroundEnter: () => {
-      // Reload stations (user may have changed favorites in settings)
       loadStations().then(() => displayCurrentStation(true))
       startAutoRefresh()
     },
     onForegroundExit: () => {
+      clearExitConfirm()
       stopAutoRefresh()
     },
   })
 
-  // Start auto-refresh
   await startAutoRefresh()
 
-  // Listen for sync from settings page (user tapped "Send to Glasses")
   window.addEventListener('subwaylens:sync', () => {
     loadStations().then(() => displayCurrentStation(true))
   })
@@ -326,16 +352,10 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
 async function main(): Promise<void> {
   try {
-    // Check if we're inside the Even App WebView by looking for the
-    // Flutter native handler. The SDK always injects a bridge object,
-    // but the Flutter handler only exists inside the real Even App.
     const hasFlutter =
       !!(window as any).flutter_inappwebview ||
       !!(window as any).webkit?.messageHandlers?.callHandler
 
-    // Always show the settings page on the phone screen.
-    // In the Even App WebView, this is the config UI the user sees.
-    // In a regular browser, this is the only UI.
     initSettingsPage()
 
     if (hasFlutter) {
@@ -343,7 +363,6 @@ async function main(): Promise<void> {
       await startGlassesMode(b)
     }
   } catch {
-    // Bridge error — settings page is already initialized above
     console.warn('Glasses mode failed, settings page still available')
   }
 }

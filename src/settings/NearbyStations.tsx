@@ -120,20 +120,20 @@ export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbySt
       {results.map(({ station, distance }) => {
         const isFav = favoriteIds.includes(station.id)
         return (
-          <div key={station.id} className="flex items-center gap-3 bg-surface p-4">
+          <div key={station.id} className="flex items-center gap-3 bg-surface p-4 border-b border-border last:border-b-0">
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-[15px] tracking-[-0.15px] text-text">
                   {station.name}
                 </span>
-                <span className="text-[12px] tracking-[-0.12px] text-text-dim shrink-0">
+                <span className="text-[11px] tracking-[-0.11px] text-text-dim bg-surface-light border border-border px-2 py-0.5 rounded-full shrink-0">
                   {distance.toFixed(2)} mi
                 </span>
               </div>
               <RouteBadges routes={station.routes} />
             </div>
             {isFav ? (
-              <span className="shrink-0 text-text-dim text-[17px] w-8 h-8 flex items-center justify-center">
+              <span className="shrink-0 text-positive text-[17px] w-8 h-8 flex items-center justify-center">
                 &#x2713;
               </span>
             ) : (

@@ -25,40 +25,57 @@ const MAX_TRAINS = 3
 /** Approximate chars per line on the G2 display */
 const CHARS_PER_LINE = 38
 
+/** Fixed terminal name display width — pads short names, truncates long ones */
+const TERMINAL_WIDTH = 15
+
 /**
- * Render the header text container content.
- * Shows station name + favorite star.
+ * Get the current time as a short H:MMa/p string for the header clock.
  */
-export function renderHeader(station: Station, isFavorite: boolean): string {
-  const star = isFavorite ? ' \u2605' : '' // ★
-  const name = station.name
-  // Truncate name if too long with star
-  const maxNameLen = CHARS_PER_LINE - star.length
-  const displayName =
-    name.length > maxNameLen ? name.slice(0, maxNameLen - 2) + '..' : name
-  return displayName + star
+function getCurrentTimeStr(): string {
+  const d = new Date()
+  const h = d.getHours()
+  const m = d.getMinutes().toString().padStart(2, '0')
+  const hour12 = h % 12 || 12
+  const ampm = h < 12 ? 'a' : 'p'
+  return `${hour12}:${m}${ampm}`
 }
 
 /**
- * Format a single train line: "[R] Terminal      N min - H:MM"
+ * Render the header text container content.
+ * Shows station name + favorite star + live clock on the right.
+ */
+export function renderHeader(station: Station, isFavorite: boolean): string {
+  const star = isFavorite ? ' \u2605' : ''
+  const timeStr = getCurrentTimeStr()
+  const name = station.name
+  const maxNameLen = CHARS_PER_LINE - star.length - 1 - timeStr.length
+  const displayName =
+    name.length > maxNameLen ? name.slice(0, maxNameLen - 2) + '..' : name
+  const gap = Math.max(1, CHARS_PER_LINE - displayName.length - star.length - timeStr.length)
+  return displayName + star + ' '.repeat(gap) + timeStr
+}
+
+/**
+ * Format a single train line with fixed-width terminal column.
+ * Terminal name always padded/truncated to TERMINAL_WIDTH chars so the
+ * time column starts at a consistent horizontal position.
  *
- * The G2 font is NOT monospaced so padding with spaces is approximate.
- * We aim for a readable layout, not pixel-perfect alignment.
+ * Format: "▶[R] Terminal_name___  Nm H:MM"
  */
 function formatTrainLine(arrival: TrainArrival, now: number): string {
   const badge = `[${arrival.route}]`
   const time = formatArrival(arrival.arrivalTime, now)
-  const terminal =
-    arrival.terminal.length > 19
-      ? arrival.terminal.slice(0, 18) + '.'
-      : arrival.terminal
 
-  // Highlight marker for trains arriving soon (< 4 min)
-  // Use filled triangle ▶ (U+25B6, confirmed in G2 font) as attention indicator
+  // Fixed-width terminal: truncate or pad to TERMINAL_WIDTH
+  const raw = arrival.terminal
+  const terminal = raw.length > TERMINAL_WIDTH
+    ? raw.slice(0, TERMINAL_WIDTH - 1) + '.'
+    : raw.padEnd(TERMINAL_WIDTH, ' ')
+
   const soon = isArrivingSoon(arrival.arrivalTime, now)
   const marker = soon ? '\u25B6' : ' '
 
-  // Build line: "▶[R] Terminal   N min - H:MM"  or  " [R] Terminal   N min - H:MM"
+  // marker(1) + badge(3-4) + space(1) + terminal(15) + space(1) + time
   const left = `${marker}${badge} ${terminal}`
   const gap = Math.max(1, CHARS_PER_LINE - left.length - time.length)
   return left + ' '.repeat(gap) + time
@@ -66,19 +83,15 @@ function formatTrainLine(arrival: TrainArrival, now: number): string {
 
 /**
  * Build a direction label from train terminals.
- * Uses the most common terminal among the trains. Falls back to station
- * static label (station.north / station.south) when no trains available.
  */
 function directionLabel(trains: TrainArrival[], fallback: string): string {
   if (trains.length === 0) return fallback
-  // Group routes by terminal
   const termToRoutes = new Map<string, string[]>()
   for (const t of trains) {
     const routes = termToRoutes.get(t.terminal) || []
     if (!routes.includes(t.route)) routes.push(t.route)
     termToRoutes.set(t.terminal, routes)
   }
-  // Pick the most common terminal
   let best = ''
   let bestCount = 0
   for (const [term, routes] of termToRoutes) {
@@ -92,10 +105,7 @@ function directionLabel(trains: TrainArrival[], fallback: string): string {
 
 /**
  * Render the body text container content.
- * Shows both directions with train arrivals and progress bar.
- *
- * Note: no heavy divider at the top — the simulator/hardware renders a
- * container boundary line between the header and body containers.
+ * Shows both directions with train arrivals, progress bar, and control hint.
  */
 export function renderBody(
   station: Station,
@@ -106,17 +116,16 @@ export function renderBody(
   const now = Math.floor(Date.now() / 1000)
   const lines: string[] = []
 
-  // ── North direction ──
+  // North direction
   const northTrains = arrivals.north.slice(0, MAX_TRAINS)
   const northLabel = directionLabel(northTrains, station.north)
-  lines.push(`\u25B2 ${northLabel}`) // ▲ Direction
-  
-  // Add borough code if available
+  lines.push(`\u25B2 ${northLabel}`)
+
   const northBorough = getBoroughCode(northLabel)
   if (northBorough) {
     lines.push(northBorough)
   }
-  
+
   if (northTrains.length === 0) {
     lines.push('  No live data')
   } else {
@@ -125,20 +134,19 @@ export function renderBody(
     }
   }
 
-  // Dashed divider between directions
-  lines.push('\u2500 '.repeat(Math.floor(CHARS_PER_LINE / 2)))
+  // Solid heavy divider between directions
+  lines.push('\u2501'.repeat(CHARS_PER_LINE))
 
-  // ── South direction ──
+  // South direction
   const southTrains = arrivals.south.slice(0, MAX_TRAINS)
   const southLabel = directionLabel(southTrains, station.south)
-  lines.push(`\u25BC ${southLabel}`) // ▼ Direction
-  
-  // Add borough code if available
+  lines.push(`\u25BC ${southLabel}`)
+
   const southBorough = getBoroughCode(southLabel)
   if (southBorough) {
     lines.push(southBorough)
   }
-  
+
   if (southTrains.length === 0) {
     lines.push('  No live data')
   } else {
@@ -147,7 +155,7 @@ export function renderBody(
     }
   }
 
-  // ── Progress bar ──
+  // Progress bar
   if (totalStations > 1) {
     const pos = `${stationIndex + 1}/${totalStations}`
     const barTotal = CHARS_PER_LINE - pos.length - 1
@@ -160,6 +168,24 @@ export function renderBody(
     lines.push(bar + ' ' + pos)
   }
 
+  // Control hint
+  lines.push('tap:refresh  dbl:exit')
+
+  return lines.join('\n')
+}
+
+/**
+ * Render the exit confirmation interstitial.
+ * Shown after the first double-tap. Second double-tap exits;
+ * any scroll or tap cancels back to the normal view.
+ */
+export function renderExitConfirm(): string {
+  const lines: string[] = []
+  lines.push('')
+  lines.push('  Double-tap again to exit.')
+  lines.push('')
+  lines.push('  Scroll or tap to cancel.')
+  lines.push('')
   return lines.join('\n')
 }
 
