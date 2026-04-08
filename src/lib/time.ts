@@ -21,7 +21,7 @@ export function formatArrival(arrivalTime: number, now?: number): string {
   const clock = `${hour12}:${m}`
 
   if (mins === 0) return `NOW ${clock}`
-  return `${mins}m ${clock}`
+  return `${mins}m - ${clock}`
 }
 
 /**
