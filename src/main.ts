@@ -27,12 +27,15 @@ import {
   nextStation,
   prevStation,
   refreshCurrentArrivals,
+  refreshAlerts,
+  getCachedAlerts,
   isFavorite,
   getState,
 } from './glasses/stations'
 import {
   renderHeader,
   renderBody,
+  renderAlertSummary,
   renderLoading,
   renderNoStations,
   renderExitConfirm,
@@ -52,12 +55,15 @@ let bridge: EvenAppBridge | null = null
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 // ── Exit confirmation state ──
-// Double-tap shows a confirmation screen; a second double-tap within
-// EXIT_CONFIRM_MS exits the app. Any scroll or tap cancels.
 const EXIT_CONFIRM_MS = 3000
 let exitConfirmPending = false
 let exitConfirmTimer: ReturnType<typeof setTimeout> | null = null
 let lastBodyText = ''
+
+// ── Alert view toggle state ──
+// When alerts exist, tap switches between arrivals and alert summary.
+// Switching stations always resets to arrivals view.
+let isAlertView = false
 
 function clearExitConfirm(): void {
   exitConfirmPending = false
@@ -190,6 +196,9 @@ async function updateHeader(text: string): Promise<void> {
 // ── Display update logic ──
 
 async function displayCurrentStation(useRebuild: boolean): Promise<void> {
+  // Switching stations always resets alert view
+  isAlertView = false
+
   const station = currentStation()
   const { stations, currentIndex } = getState()
 
@@ -212,10 +221,14 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     await updateBody(renderLoading())
   }
 
-  const arrivals = await refreshCurrentArrivals()
+  const [arrivals] = await Promise.all([
+    refreshCurrentArrivals(),
+    refreshAlerts(),
+  ])
   if (!arrivals) return
 
-  const bodyText = renderBody(station, arrivals, currentIndex, stations.length)
+  const alerts = getCachedAlerts()
+  const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
   lastBodyText = bodyText
   await updateBody(bodyText)
 }
@@ -224,16 +237,27 @@ async function refreshInPlace(): Promise<void> {
   const station = currentStation()
   if (!station) return
 
-  const arrivals = await refreshCurrentArrivals()
+  const [arrivals] = await Promise.all([
+    refreshCurrentArrivals(),
+    refreshAlerts(),
+  ])
   if (!arrivals) return
 
   const { stations, currentIndex } = getState()
-  const bodyText = renderBody(station, arrivals, currentIndex, stations.length)
+  const alerts = getCachedAlerts()
+  const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
   lastBodyText = bodyText
-  await updateBody(bodyText)
+
+  // If user was in alert view, refresh that too
+  if (isAlertView) {
+    await updateBody(renderAlertSummary(arrivals, alerts))
+  } else {
+    await updateBody(bodyText)
+  }
 }
 
 async function restoreNormalDisplay(): Promise<void> {
+  isAlertView = false
   if (lastBodyText) {
     await updateBody(lastBodyText)
   } else {
@@ -280,16 +304,21 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   }
 
   if (station) {
-    const arrivals = await refreshCurrentArrivals()
+    const [arrivals] = await Promise.all([
+      refreshCurrentArrivals(),
+      refreshAlerts(),
+    ])
     if (arrivals) {
       const { stations, currentIndex } = getState()
-      const bodyText = renderBody(station, arrivals, currentIndex, stations.length)
+      const alerts = getCachedAlerts()
+      const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
       lastBodyText = bodyText
       await updateBody(bodyText)
     }
   }
 
   setupInput(b, {
+
     onScrollDown: async () => {
       if (exitConfirmPending) {
         clearExitConfirm()
@@ -299,6 +328,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       nextStation()
       displayCurrentStation(true)
     },
+
     onScrollUp: async () => {
       if (exitConfirmPending) {
         clearExitConfirm()
@@ -308,14 +338,44 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       prevStation()
       displayCurrentStation(true)
     },
+
     onTap: async () => {
       if (exitConfirmPending) {
         clearExitConfirm()
         await restoreNormalDisplay()
         return
       }
-      refreshInPlace()
+
+      const station = currentStation()
+      const cachedArrivals = station
+        ? getState().arrivals.get(station.id) ?? null
+        : null
+      const alerts = getCachedAlerts()
+
+      // Check if any routes at this station have active alerts
+      const routeIds = cachedArrivals
+        ? [
+            ...cachedArrivals.north.map(t => t.route),
+            ...cachedArrivals.south.map(t => t.route),
+          ]
+        : []
+      const hasAlerts = routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0)
+
+      if (hasAlerts && cachedArrivals) {
+        // Toggle between arrivals and alert summary
+        isAlertView = !isAlertView
+        if (isAlertView) {
+          await updateBody(renderAlertSummary(cachedArrivals, alerts))
+        } else {
+          await updateBody(lastBodyText)
+        }
+      } else {
+        // No alerts — tap refreshes as before
+        isAlertView = false
+        refreshInPlace()
+      }
     },
+
     onDoubleTap: async () => {
       if (exitConfirmPending) {
         clearExitConfirm()
@@ -331,12 +391,16 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
         }, EXIT_CONFIRM_MS)
       }
     },
+
     onForegroundEnter: () => {
+      isAlertView = false
       loadStations().then(() => displayCurrentStation(true))
       startAutoRefresh()
     },
+
     onForegroundExit: () => {
       clearExitConfirm()
+      isAlertView = false
       stopAutoRefresh()
     },
   })

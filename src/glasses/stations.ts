@@ -4,12 +4,13 @@
  * Manages the active station list (favorites + nearby GPS stations),
  * cycling between them, and fetching arrivals.
  */
-
 import stationsData from '../data/stations.json'
 import { getStationArrivals } from '../data/mta-feeds'
+import { fetchAlerts } from '../data/alerts'
 import { getFavorites, getSettings } from '../lib/storage'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
 import type { Station, StationArrivals, AppSettings } from '../lib/types'
+import type { RouteAlert } from '../data/alerts'
 
 const allStations = stationsData as Station[]
 
@@ -28,6 +29,8 @@ export interface StationManagerState {
   currentIndex: number
   /** Cached arrivals per station ID */
   arrivals: Map<string, StationArrivals>
+  /** Cached service alerts per route ID */
+  alerts: Map<string, RouteAlert[]>
 }
 
 let state: StationManagerState = {
@@ -35,6 +38,7 @@ let state: StationManagerState = {
   favoriteIds: new Set(),
   currentIndex: 0,
   arrivals: new Map(),
+  alerts: new Map(),
 }
 
 export function getState(): StationManagerState {
@@ -47,7 +51,6 @@ export function getState(): StationManagerState {
 export async function loadStations(): Promise<void> {
   const favIds = await getFavorites()
   const settings = await getSettings()
-
   state.favoriteIds = new Set(favIds)
 
   // Start with favorites in saved order
@@ -77,6 +80,23 @@ export async function loadStations(): Promise<void> {
   if (state.currentIndex >= stationList.length) {
     state.currentIndex = Math.max(0, stationList.length - 1)
   }
+}
+
+/**
+ * Fetch and cache service alerts for all routes.
+ * Called alongside refreshCurrentArrivals().
+ */
+export async function refreshAlerts(): Promise<Map<string, RouteAlert[]>> {
+  const alerts = await fetchAlerts()
+  state.alerts = alerts
+  return alerts
+}
+
+/**
+ * Get the current cached alerts map.
+ */
+export function getCachedAlerts(): Map<string, RouteAlert[]> {
+  return state.alerts
 }
 
 /**
@@ -113,7 +133,6 @@ export function prevStation(): Station | null {
 export async function refreshCurrentArrivals(): Promise<StationArrivals | null> {
   const station = currentStation()
   if (!station) return null
-
   const arrivals = await getStationArrivals(station)
   state.arrivals.set(station.id, arrivals)
   return arrivals

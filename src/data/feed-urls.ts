@@ -41,3 +41,10 @@ export function feedUrlsForRoutes(routes: string[]): string[] {
   }
   return Array.from(urls)
 }
+
+/**
+ * MTA GTFS-RT subway alerts feed.
+ * Returns active service alerts for all subway routes.
+ */
+export const ALERTS_FEED_URL =
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts'

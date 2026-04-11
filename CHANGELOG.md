@@ -1,4 +1,20 @@
 # Changelog
+## v1.5.0 — 2026-04-11
+Quality-of-life release: smarter terminal name display, MTA service alerts, last-refreshed timestamp, and dependency updates.
+### Glasses Display
+- **Smart terminal abbreviations** — curated lookup table (~50 entries) maps verbose MTA terminal names to short, rider-recognizable abbreviations. `Coney Island-Stillwell Av` becomes `Coney Island`, `Van Cortlandt Park-242 St` becomes `Van Cortlandt`, `Jamaica Center-Parsons/Archer` becomes `Jamaica Ctr`, etc. Falls back to existing truncation for unlisted terminals.
+- **Service alert indicators** — route badges now show `[E!]` instead of `[E]` when MTA reports an active service alert for that route. Fetched from the MTA GTFS-RT alerts feed alongside arrivals data.
+- **Alert summary view** — tap to toggle between arrivals view and a condensed alert summary when alerts are active. Shows affected route, alert header text. Footer hint updates to `tap:alerts  dbl:exit` when alerts exist, `tap:trains  dbl:exit` to return.
+- **Last-refreshed timestamp** — footer line now shows the time of last successful data fetch (e.g. `10:24a  tap:refresh  dbl:exit`). Users can immediately tell if arrival data is fresh or stale.
+### Dependencies
+- `@evenrealities/even_hub_sdk` updated from 0.0.9 to 0.0.10 (shadow-timers fix for WebView timer reliability)
+- `@evenrealities/evenhub-cli` updated from 0.1.10 to 0.1.11
+- `even-toolkit` updated from 1.1.2 to 1.7.0 (full component library now available for future use)
+- `react-router` added as peer dependency (required by even-toolkit 1.3.0+)
+### New Files
+- `src/data/terminal-abbrevs.ts` — terminal name abbreviation lookup table
+- `src/data/alerts.ts` — MTA GTFS-RT alerts fetch, decode, and cache layer
+
 
 ## v1.4.0 — 2026-04-07
 
