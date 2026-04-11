@@ -246,6 +246,7 @@ async function refreshInPlace(): Promise<void> {
   const { stations, currentIndex } = getState()
   const alerts = getCachedAlerts()
   const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
+  await updateHeader(renderHeader(station, isFavorite(station.id)))
   lastBodyText = bodyText
 
   // If user was in alert view, refresh that too

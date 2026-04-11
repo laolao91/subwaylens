@@ -2,7 +2,7 @@
   "package_id": "com.subwaylens.app",
   "edition": "202601",
   "name": "SubwayLens",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "min_app_version": "0.1.0",
   "min_sdk_version": "0.0.10",
   "tagline": "MTA subway arrivals on your glasses",

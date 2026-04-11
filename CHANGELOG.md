@@ -1,4 +1,12 @@
 # Changelog
+## v1.5.1 — 2026-04-11
+Fix: header clock now updates on every auto-refresh cycle, not only on station switch.
+
+### Bug Fixes
+- **Clock freeze** — `refreshInPlace()` now calls `updateHeader()` alongside `updateBody()`. The header clock previously only updated when scrolling to a new station or sending favorites from the phone.
+
+---
+
 ## v1.5.0 — 2026-04-11
 Quality-of-life release: smarter terminal name display, MTA service alerts, last-refreshed timestamp, and dependency updates.
 ### Glasses Display
