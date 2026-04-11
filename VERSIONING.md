@@ -10,49 +10,46 @@ SubwayLens follows [Semantic Versioning 2.0.0](https://semver.org/).
 
 ## Where the version lives
 
-All three must stay in sync:
+All four must stay in sync:
 
 | File | Field | Example |
 |------|-------|---------|
-| `package.json` | `"version"` | `"1.0.0"` |
-| `app.json` | `"version"` | `"1.0.0"` |
-| `CHANGELOG.md` | Section header | `## v1.0.0 — 2026-03-15` |
+| `package.json` | `"version"` | `"1.5.0"` |
+| `app.json` | `"version"` | `"1.5.0"` |
+| `src/settings/SettingsApp.tsx` | Footer string | `v1.5.0` |
+| `CHANGELOG.md` | Section header | `## v1.5.0 — 2026-04-11` |
 
 ## Git tags
 
 Tag each release:
 
 ```bash
-git tag -a v1.0.0 -m "v1.0.0 — Initial UAT release"
-git push origin v1.0.0
+git tag v1.5.0
+git push origin v1.5.0
 ```
 
 ## Pre-release versions
 
 For testing builds before a release, use pre-release identifiers:
-
-```
-1.1.0-beta.1    First beta of the next minor release
-1.1.0-beta.2    Second beta
-1.1.0-rc.1      Release candidate
-1.1.0           Final release
-```
-
 ## Release checklist
 
 1. Update version in `package.json` and `app.json`
-2. Add a new section to `CHANGELOG.md` with the date and changes
-3. Run `npx tsc --noEmit` — must compile clean
-4. Run `npx vite build` — must succeed
-5. Update `tests.md` with any new bugs, fixes, or regression tests
-6. Commit: `git commit -m "release: v1.1.0"`
-7. Tag: `git tag -a v1.1.0 -m "v1.1.0 — description"`
-8. Build package: `npm run pack`
+2. Update version footer string in `src/settings/SettingsApp.tsx`
+3. Add a new section to `CHANGELOG.md` with the date and changes
+4. Update version history table in `VERSIONING.md`
+5. Update `Current version` in `README.md`
+6. Update Roadmap checkboxes in `README.md` for any shipped features
+7. Run `npm run build` — must compile and bundle clean
+8. Commit: `git commit -m "vX.Y.Z — description"`
+9. Tag: `git tag vX.Y.Z`
+10. Push: `git push origin main && git push origin vX.Y.Z`
 
 ## Version history
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5.0 | 2026-04-11 | Smart terminal abbreviations, MTA service alerts with tap-toggle summary, last-refreshed timestamp in footer, dependency updates (SDK 0.0.10, even-toolkit 1.7.0). |
+| 1.4.0 | 2026-04-07 | UI improvements: list dividers, green checkmarks, larger route badges, distance pills. Glasses: compact time format, NOW for imminent trains, solid direction divider, live clock in header, control hint footer, exit confirmation flow. |
 | 1.3.0 | 2026-03-28 | Nearby stations display on phone settings page with GPS detection, distance, and add-to-favorites. |
 | 1.2.3 | 2026-03-28 | Added location permission to app.json. |
 | 1.2.2 | 2026-03-28 | Added network permission whitelist to app.json. |

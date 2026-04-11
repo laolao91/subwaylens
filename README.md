@@ -28,9 +28,10 @@ Or open this URL in the Even App: **https://subwaylens.vercel.app/**
 
 ## What it does
 
-- **Glasses:** Shows real-time subway arrivals for your favorited stations. Scroll between stations, tap to refresh, double-tap to exit.
+- **Glasses:** Shows real-time subway arrivals for your favorited stations. Scroll between stations, tap to refresh (or view service alerts when active), double-tap to exit.
 - **Phone:** Settings page inside the Even App for searching 470+ MTA stations, adding/removing/reordering favorites, viewing GPS-detected nearby stations with distance, and adjusting refresh interval and nearby station detection.
 - **Live data:** Fetches MTA GTFS-RT protobuf feeds directly — no backend server, no API key required.
+- **Service alerts:** Fetches MTA service alerts alongside arrivals. Affected route badges show `[E!]`. Tap to view alert summaries when alerts are active.
 - **No fake data:** When MTA feeds are unreachable, the display shows "No live data" rather than made-up times. You always know what you're seeing is real.
 
 ## Why this exists
@@ -60,7 +61,7 @@ This is also a reference implementation for building Even Hub apps that combine 
 ### Install and run
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/subwaylens.git
+git clone https://github.com/laolao91/subwaylens.git
 cd subwaylens
 npm install
 npm run dev
@@ -71,23 +72,10 @@ Open `http://localhost:5173` in your browser to see the settings page. The app d
 ### Simulator testing
 
 ```bash
-# Clone even-dev alongside this project
-git clone https://github.com/BxNxM/even-dev.git ../even-dev
-cd ../even-dev && npm install
-
-# Register SubwayLens
-echo '{"subwaylens": "../subwaylens"}' > apps.json
-
-# Launch
-APP_NAME=subwaylens ./start-even.sh
+npx @evenrealities/evenhub-simulator
 ```
 
-The simulator opens a glasses display window and a browser window. Add favorites via the browser console:
-
-```javascript
-localStorage.setItem('favorites', JSON.stringify(["263", "616", "611"]))
-location.reload()
-```
+The simulator opens a glasses display window alongside your running dev server. Add favorites via the browser settings page, then tap "Send to Glasses" to sync.
 
 ### Real G2 glasses
 
@@ -98,16 +86,12 @@ npm run qr                     # Generate QR code
 ```
 
 ## How it works
-
-```
-[MTA GTFS-RT feeds] <--HTTPS--> [iPhone WebView (app logic)] <--BLE--> [G2 Glasses]
-```
-
 1. The Even App loads SubwayLens in a WebView
 2. The app initializes the settings page (visible on the phone) AND the glasses display (via the SDK bridge)
 3. For each favorited station, it fetches the relevant MTA GTFS-RT protobuf feeds, decodes them, and extracts upcoming arrivals
-4. The glasses display is rendered as text using two containers: a header (station name) and a body (directions + trains + progress bar)
-5. Input events from the R1 ring or temple gestures cycle between stations, refresh data, or exit
+4. Service alerts are fetched from the MTA alerts feed alongside arrivals — active alerts show as `[E!]` badge indicators
+5. The glasses display is rendered as text using two containers: a header (station name + clock) and a body (directions + trains + progress bar + timestamp)
+6. Input events from the R1 ring or temple gestures cycle between stations, refresh data, toggle alert summaries, or exit
 
 ### Glasses input
 
@@ -115,65 +99,35 @@ npm run qr                     # Generate QR code
 |-------|--------|
 | Scroll down | Next station |
 | Scroll up | Previous station |
-| Tap | Refresh arrivals |
-| Double-tap | Exit app |
+| Tap (no alerts) | Refresh arrivals |
+| Tap (alerts active) | Toggle alert summary view |
+| Double-tap | Exit app (confirmation required) |
 
 ## Project structure
-
-```
-subwaylens/
-  index.html              Entry point loaded by the Even App WebView
-  package.json            Dependencies and npm scripts
-  app.json                Even Hub app manifest
-  src/
-    main.ts               Boot logic, bridge detection, dual-mode routing
-    app.css                Even-toolkit light theme + Tailwind + MTA badges
-    glasses/
-      display.ts           Text rendering for the 576x288 glasses display
-      input.ts             SDK event handling with quirk workarounds
-      stations.ts          Station list manager (favorites + GPS nearby)
-    settings/
-      SettingsApp.tsx       React root — data loading, sections, sync, toast
-      FavoritesList.tsx     Drag-to-reorder (touch + mouse) + delete
-      NearbyStations.tsx    GPS-detected nearby stations with distance
-      StationSearch.tsx     Debounced search with route badges
-      SettingsPanel.tsx     Refresh interval, nearby toggle, radius
-      RouteBadge.tsx        MTA brand color badges
-      settings-mount.tsx    Bridges initSettingsPage() to React
-      search.ts            Station search with common-name aliases
-    data/
-      mta-feeds.ts         GTFS-RT protobuf fetch and decode
-      feed-urls.ts         MTA feed URL routing per line group
-      stations.json        All 470+ NYC subway stations (static data)
-    lib/
-      types.ts             TypeScript interfaces and defaults
-      storage.ts           Bridge localStorage with browser fallback
-      time.ts              Arrival time formatting
-      geo.ts               GPS distance calculations
-```
-
 ## Even Hub SDK notes
 
 If you're building your own G2 app, here are the key lessons from this project:
 
 - **Bridge detection:** The SDK injects `EvenAppBridge` in all environments. Check for `window.flutter_inappwebview` to detect the real Even App vs a regular browser.
 - **Dual mode:** Always show a settings UI on the phone AND send display data to the glasses. Don't make them mutually exclusive.
-- **SDK 0.0.9 update:** Earlier SDK versions used `borderRdaius` (typo). SDK 0.0.9+ corrected this to `borderRadius`. Use the correct spelling for SDK 0.0.9+.
+- **`borderRdaius` typo:** The G2 SDK uses `borderRdaius` (intentional typo in the SDK). Using the correct spelling `borderRadius` silently fails. Always use `borderRdaius`.
 - **Permissions manifest:** Always declare `network` (with whitelist), `location`, or other permissions in `app.json` even if the browser APIs work without them. Even Hub requires explicit permission declarations.
 - **`CLICK_EVENT = 0`:** The SDK's `fromJson` normalizes `0` to `undefined`. Always check `eventType === OsEventTypeList.CLICK_EVENT || eventType === undefined`.
 - **Scroll events are boundary events:** `SCROLL_TOP_EVENT` and `SCROLL_BOTTOM_EVENT` fire when internal scroll hits the edge, not on every gesture. Use a 300ms cooldown.
 - **Touch events in WebView:** HTML5 Drag and Drop doesn't work in mobile WebViews. Use `touchstart`/`touchmove`/`touchend` for drag-to-reorder.
+- **MTA feed HEAD requests:** MTA endpoints return 403 for HEAD requests. Use GET with `AbortController` to cancel after headers are received.
+- **Protobuf Long objects:** MTA GTFS-RT timestamps decode as protobuf Long objects. Coerce with `Number()` before arithmetic.
 
 ## Roadmap
 
+- [x] Smart terminal name abbreviations for the glasses display
+- [x] Service alerts and planned work notifications
 - [ ] Per-station direction label overrides (match MTA platform signage)
-- [ ] Smart terminal name abbreviations for the glasses display
 - [ ] LIRR and Metro-North support
-- [ ] Bus system support
-- [ ] Service alerts and planned work notifications
 - [ ] Per-station line filtering (hide routes you don't ride)
 - [ ] Compact view mode
 - [ ] Walking time estimates to nearby stations
+- [ ] Bus support (separate BusLens app)
 
 ## Contributing
 
@@ -187,13 +141,13 @@ Contributions welcome! This is an early-stage project. If you have G2 glasses an
 6. Commit with a descriptive message
 7. Open a PR
 
-Please read [tests.md](tests.md) for known issues and [CHANGELOG.md](CHANGELOG.md) for version history.
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## Versioning
 
 This project follows [Semantic Versioning](https://semver.org/). See [VERSIONING.md](VERSIONING.md) for the full policy.
 
-Current version: **1.3.0**
+Current version: **1.5.0**
 
 ## License
 
@@ -205,5 +159,5 @@ Copyright (c) 2026 Steven Lao
 
 - [Even Realities](https://www.evenrealities.com/) for the G2 glasses and Even Hub SDK
 - [MTA](https://api.mta.info/) for the public GTFS-RT feeds
-- [even-dev](https://github.com/BxNxM/even-dev) simulator by BxNxM
+- [even-toolkit](https://www.npmjs.com/package/even-toolkit) community design system by Fabio
 - [gtfs-realtime-bindings](https://www.npmjs.com/package/gtfs-realtime-bindings) for protobuf decoding
