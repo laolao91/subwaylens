@@ -404,6 +404,12 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       isAlertView = false
       stopAutoRefresh()
     },
+
+    onAbnormalExit: () => {
+      clearExitConfirm()
+      isAlertView = false
+      stopAutoRefresh()
+    },
   })
 
   await startAutoRefresh()

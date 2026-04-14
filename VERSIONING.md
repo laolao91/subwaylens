@@ -48,6 +48,8 @@ For testing builds before a release, use pre-release identifiers:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5.2 | 2026-04-14 | Handle ABNORMAL_EXIT_EVENT to stop auto-refresh on unexpected disconnect. |
+| 1.5.1 | 2026-04-11 | Header clock now updates on every auto-refresh cycle. |
 | 1.5.0 | 2026-04-11 | Smart terminal abbreviations, MTA service alerts with tap-toggle summary, last-refreshed timestamp in footer, dependency updates (SDK 0.0.10, even-toolkit 1.7.0). |
 | 1.4.0 | 2026-04-07 | UI improvements: list dividers, green checkmarks, larger route badges, distance pills. Glasses: compact time format, NOW for imminent trains, solid direction divider, live clock in header, control hint footer, exit confirmation flow. |
 | 1.3.0 | 2026-03-28 | Nearby stations display on phone settings page with GPS detection, distance, and add-to-favorites. |

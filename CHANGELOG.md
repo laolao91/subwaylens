@@ -1,4 +1,12 @@
 # Changelog
+## v1.5.2 — 2026-04-14
+Fix: handle ABNORMAL_EXIT_EVENT to stop auto-refresh on unexpected disconnect.
+
+### Bug Fixes
+- **Connection lost error on app close** — SubwayLens now handles `ABNORMAL_EXIT_EVENT` from the SDK. Previously, closing the EvenRealities companion app while SubwayLens was active left the auto-refresh timer running, causing bridge calls to a dead connection and a "connection lost" error on the glasses display. The timer is now stopped cleanly on disconnect.
+
+---
+
 ## v1.5.1 — 2026-04-11
 Fix: header clock now updates on every auto-refresh cycle, not only on station switch.
 

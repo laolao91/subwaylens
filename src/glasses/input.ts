@@ -19,6 +19,7 @@ export interface InputCallbacks {
   onDoubleTap: () => void
   onForegroundEnter?: () => void
   onForegroundExit?: () => void
+  onAbnormalExit?: () => void
 }
 
 const SCROLL_COOLDOWN_MS = 300
@@ -40,7 +41,8 @@ function resolveEventType(
     eventType === OsEventTypeList.SCROLL_BOTTOM_EVENT ||
     eventType === OsEventTypeList.DOUBLE_CLICK_EVENT ||
     eventType === OsEventTypeList.FOREGROUND_ENTER_EVENT ||
-    eventType === OsEventTypeList.FOREGROUND_EXIT_EVENT
+    eventType === OsEventTypeList.FOREGROUND_EXIT_EVENT ||
+    eventType === OsEventTypeList.ABNORMAL_EXIT_EVENT
   ) {
     return eventType
   }
@@ -91,6 +93,10 @@ export function setupInput(
       }
       case OsEventTypeList.FOREGROUND_EXIT_EVENT: {
         callbacks.onForegroundExit?.()
+        break
+      }
+      case OsEventTypeList.ABNORMAL_EXIT_EVENT: {
+        callbacks.onAbnormalExit?.()
         break
       }
     }
