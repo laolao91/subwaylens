@@ -131,7 +131,7 @@ export function SettingsApp() {
         />
 
         <p className="text-[11px] tracking-[-0.11px] text-text-dim text-center mt-8">
-          v1.5.2 &#x00B7; Changes auto-save. Tap &#x201C;Send to Glasses&#x201D; to update display.
+          v1.5.3 &#x00B7; Changes auto-save. Tap &#x201C;Send to Glasses&#x201D; to update display.
         </p>
       </div>
 

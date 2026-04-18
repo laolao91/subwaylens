@@ -48,6 +48,7 @@ For testing builds before a release, use pre-release identifiers:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5.3 | 2026-04-18 | Dependency maintenance: SDK 0.0.10, CLI 0.1.12, protobufjs security fix, npm 11.12.1. |
 | 1.5.2 | 2026-04-14 | Handle ABNORMAL_EXIT_EVENT to stop auto-refresh on unexpected disconnect. |
 | 1.5.1 | 2026-04-11 | Header clock now updates on every auto-refresh cycle. |
 | 1.5.0 | 2026-04-11 | Smart terminal abbreviations, MTA service alerts with tap-toggle summary, last-refreshed timestamp in footer, dependency updates (SDK 0.0.10, even-toolkit 1.7.0). |

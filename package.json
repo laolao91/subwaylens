@@ -1,6 +1,6 @@
 {
   "name": "subwaylens",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,7 +22,7 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
-    "@evenrealities/evenhub-cli": "^0.1.11",
+    "@evenrealities/evenhub-cli": "^0.1.12",
     "@evenrealities/evenhub-simulator": "^0.6.2",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",

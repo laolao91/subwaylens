@@ -1,3 +1,16 @@
+## v1.5.3 — 2026-04-18
+
+Dependency maintenance release.
+
+### Dependency updates
+
+- **Even Hub SDK** — Updated to v0.0.10
+- **Even Hub CLI** — Updated to v0.1.12
+- **protobufjs** — Updated to patch critical security vulnerability (arbitrary code execution)
+- **npm** — Updated to v11.12.1
+
+---
+
 # Changelog
 ## v1.5.2 — 2026-04-14
 Fix: handle ABNORMAL_EXIT_EVENT to stop auto-refresh on unexpected disconnect.
