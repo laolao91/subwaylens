@@ -28,6 +28,14 @@ const MAX_TRAINS = 3
 /** Approximate chars per line on the G2 display */
 const CHARS_PER_LINE = 38
 
+/**
+ * Width for ━ (U+2501) divider and progress bar lines.
+ * ━ renders slightly wider than a regular character in the G2 LVGL font,
+ * so CHARS_PER_LINE worth of them wraps onto a second visual line (the
+ * "double line" artifact). This value keeps every ━ line safely on one row.
+ */
+const DIVIDER_WIDTH = 26
+
 /** Fixed terminal name display width — pads short names, truncates long ones */
 const TERMINAL_WIDTH = 15
 
@@ -161,7 +169,7 @@ export function renderBody(
   }
 
   // Solid heavy divider between directions
-  lines.push('━'.repeat(CHARS_PER_LINE))
+  lines.push('━'.repeat(DIVIDER_WIDTH))
 
   // South direction
   const southTrains = arrivals.south.slice(0, MAX_TRAINS)
@@ -182,7 +190,7 @@ export function renderBody(
   // Progress bar
   if (totalStations > 1) {
     const pos = `${stationIndex + 1}/${totalStations}`
-    const barTotal = CHARS_PER_LINE - pos.length - 1
+    const barTotal = DIVIDER_WIDTH - pos.length - 1
     const filled = Math.max(
       1,
       Math.round((barTotal * (stationIndex + 1)) / totalStations)
@@ -190,6 +198,7 @@ export function renderBody(
     const empty = barTotal - filled
     const bar = '━'.repeat(filled) + '─'.repeat(empty)
     lines.push(bar + ' ' + pos)
+
   }
 
   // Control hint — changes when alerts exist for this station's routes
@@ -212,7 +221,7 @@ export function renderAlertSummary(
 ): string {
   const lines: string[] = []
   lines.push('! SERVICE ALERTS')
-  lines.push('━'.repeat(CHARS_PER_LINE))
+  lines.push('━'.repeat(DIVIDER_WIDTH))
 
   const routeIds = routeIdsFromArrivals(arrivals)
   const activeAlerts = alertsForRoutes(alerts, routeIds).slice(0, 4)
@@ -238,7 +247,7 @@ export function renderAlertSummary(
     }
   }
 
-  lines.push('━'.repeat(CHARS_PER_LINE))
+  lines.push('━'.repeat(DIVIDER_WIDTH))
   lines.push('tap:trains  dbl:exit')
 
   return lines.join('\n')
