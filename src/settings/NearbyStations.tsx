@@ -8,10 +8,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from 'even-toolkit/web'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
 import { RouteBadges } from './RouteBadge'
-import stationsData from '../data/stations.json'
+import { allStations } from '../data/stations'
 import type { Station } from '../lib/types'
-
-const allStations = stationsData as Station[]
 
 interface NearbyStationsProps {
   enabled: boolean

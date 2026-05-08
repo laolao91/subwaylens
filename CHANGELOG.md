@@ -1,3 +1,35 @@
+## v1.5.4 — 2026-05-02
+
+Code-quality and reliability release. No new user-visible features — all changes are under the hood.
+
+### Bug Fixes
+
+- **Race condition: stale arrivals clobbering the display** — each display-initiating action (navigation or refresh) now captures a monotonic sequence number. Async continuations abort their write if the sequence has moved on, so a slow fetch for station A can never overwrite the display after the user has already scrolled to station B.
+- **Concurrent auto-refreshes** — an `isRefreshing` gate prevents a new interval tick from starting a second fetch while the previous one is still in flight.
+
+### Reliability
+
+- **Feed fetch timeouts** — each MTA GTFS-RT feed request now uses an `AbortController` with an 8-second timeout (matching the existing alerts feed), so a hung endpoint cannot block the refresh cycle indefinitely.
+
+### Code Quality
+
+- **Centralised station data** — `src/data/stations.ts` is a new single module that exports `allStations`, `stationById`, and `stopIdToStation`. Four files that previously each imported `stations.json` and rebuilt their own maps now share these.
+- **`getStation()` is now O(1)** — `settings/search.ts` previously did a linear `Array.find` for ID lookups; it now uses the shared `stationById` Map.
+- **Extracted `buildContainers()` helper** — `createInitialPage` and `rebuildPage` in `main.ts` shared ~40 lines of duplicated `TextContainerProperty` construction. One helper now serves both.
+- **Removed dead wrapper** — `getStationArrivals` was a redundant try/catch around `fetchStationArrivals`, which already swallows per-feed errors. The extra wrapper is removed.
+- **Removed dead null checks** — `if (!arrivals) return` guards in `displayCurrentStation` and `refreshInPlace` were unreachable since `getStationArrivals` always returns an object; removed.
+- **Clock formatting deduplication** — `display.ts` had inline H:MMa/p formatting in two places. Extracted into a shared `formatClockTime(date)` helper.
+- **Version string wired to `package.json`** — `src/lib/version.ts` imports `pkg.version` directly so the version footer in `SettingsApp.tsx` can never drift from `package.json` or `app.json`.
+- **Drag-and-drop state cleanup** — `FavoritesList.tsx` now uses `useRef` for drag index values in mouse event handlers (avoiding nested `setState` callbacks to read current state) and a `useEffect` cleanup to remove window-level listeners if the component unmounts mid-drag.
+- **Search alias guard** — alias matching now requires a minimum 3-character query, preventing short prefixes like "p" from eagerly surfacing alias results.
+- **`setupInput` unsub stored** — `main.ts` now retains the unsubscribe handle returned by `setupInput` so re-entry is safe.
+- **Collapsed duplicate lifecycle handlers** — `onForegroundExit` and `onAbnormalExit` performed identical cleanup; unified into a single `handleBackground` function.
+- **Consistent number parsing** — `SettingsPanel.tsx` now uses `Number()` for both refresh interval and nearby radius (was `parseInt` + `parseFloat`).
+- **Fixed stale docstring** — `time.ts` `formatArrival` doc now correctly shows `"Nm - H:MM"` instead of `"Nm H:MM"`.
+- **Fixed misleading comment** — `alerts.ts` comment "most relevant = first" corrected to "first encountered in feed order".
+
+---
+
 ## v1.5.3 — 2026-04-18
 
 Dependency maintenance release.

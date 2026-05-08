@@ -4,21 +4,13 @@
  * Manages the active station list (favorites + nearby GPS stations),
  * cycling between them, and fetching arrivals.
  */
-import stationsData from '../data/stations.json'
+import { allStations, stationById } from '../data/stations'
 import { getStationArrivals } from '../data/mta-feeds'
 import { fetchAlerts } from '../data/alerts'
 import { getFavorites, getSettings } from '../lib/storage'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
-import type { Station, StationArrivals, AppSettings } from '../lib/types'
+import type { Station, StationArrivals } from '../lib/types'
 import type { RouteAlert } from '../data/alerts'
-
-const allStations = stationsData as Station[]
-
-// Build lookup map by station complex ID
-const stationById = new Map<string, Station>()
-for (const s of allStations) {
-  stationById.set(s.id, s)
-}
 
 export interface StationManagerState {
   /** Ordered list of active stations (favorites + nearby) */
@@ -41,8 +33,13 @@ let state: StationManagerState = {
   alerts: new Map(),
 }
 
+/**
+ * Returns a shallow copy of state so callers cannot accidentally mutate
+ * the top-level fields. Note: arrivals and alerts Maps are still shared
+ * references — treat them as read-only.
+ */
 export function getState(): StationManagerState {
-  return state
+  return { ...state }
 }
 
 /**

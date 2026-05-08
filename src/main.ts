@@ -53,6 +53,7 @@ const BODY_NAME = 'body'
 
 let bridge: EvenAppBridge | null = null
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+let inputUnsub: (() => void) | null = null
 
 // ── Exit confirmation state ──
 const EXIT_CONFIRM_MS = 3000
@@ -65,6 +66,17 @@ let lastBodyText = ''
 // Switching stations always resets to arrivals view.
 let isAlertView = false
 
+// ── Display sequence counter ──
+// Incremented each time a navigation or display-initiating action starts.
+// Async continuations check their captured seq against the current value;
+// if they differ the display has already been superseded and the write is dropped.
+let displaySeq = 0
+
+// ── Refresh gate ──
+// Prevents concurrent auto-refreshes from overlapping if a fetch takes
+// longer than the configured interval.
+let isRefreshing = false
+
 function clearExitConfirm(): void {
   exitConfirmPending = false
   if (exitConfirmTimer) {
@@ -75,12 +87,14 @@ function clearExitConfirm(): void {
 
 // ── Glasses display helpers ──
 
-async function createInitialPage(
+/**
+ * Build the two TextContainerProperty objects used by createInitialPage and
+ * rebuildPage. Extracted so container dimensions are defined in one place.
+ */
+function buildContainers(
   headerText: string,
   bodyText: string
-): Promise<void> {
-  if (!bridge) return
-
+): [TextContainerProperty, TextContainerProperty] {
   const header = new TextContainerProperty({
     xPosition: 0,
     yPosition: 0,
@@ -111,13 +125,21 @@ async function createInitialPage(
     isEventCapture: 1,
   })
 
+  return [header, body]
+}
+
+async function createInitialPage(
+  headerText: string,
+  bodyText: string
+): Promise<void> {
+  if (!bridge) return
+  const [header, body] = buildContainers(headerText, bodyText)
   const result = await bridge.createStartUpPageContainer(
     new CreateStartUpPageContainer({
       containerTotalNum: 2,
       textObject: [header, body],
     })
   )
-
   if (result !== 0) {
     console.error('createStartUpPageContainer failed:', result)
   }
@@ -128,37 +150,7 @@ async function rebuildPage(
   bodyText: string
 ): Promise<void> {
   if (!bridge) return
-
-  const header = new TextContainerProperty({
-    xPosition: 0,
-    yPosition: 0,
-    width: 576,
-    height: 28,
-    borderWidth: 0,
-    borderColor: 0,
-    borderRadius: 0,
-    paddingLength: 4,
-    containerID: HEADER_ID,
-    containerName: HEADER_NAME,
-    content: headerText,
-    isEventCapture: 0,
-  })
-
-  const body = new TextContainerProperty({
-    xPosition: 0,
-    yPosition: 28,
-    width: 576,
-    height: 260,
-    borderWidth: 0,
-    borderColor: 0,
-    borderRadius: 0,
-    paddingLength: 4,
-    containerID: BODY_ID,
-    containerName: BODY_NAME,
-    content: bodyText,
-    isEventCapture: 1,
-  })
-
+  const [header, body] = buildContainers(headerText, bodyText)
   await bridge.rebuildPageContainer(
     new RebuildPageContainer({
       containerTotalNum: 2,
@@ -196,8 +188,10 @@ async function updateHeader(text: string): Promise<void> {
 // ── Display update logic ──
 
 async function displayCurrentStation(useRebuild: boolean): Promise<void> {
-  // Switching stations always resets alert view
+  // Each navigation bumps the sequence. If a slower fetch from a previous
+  // station completes after we've already moved on, it checks this and aborts.
   isAlertView = false
+  const seq = ++displaySeq
 
   const station = currentStation()
   const { stations, currentIndex } = getState()
@@ -225,35 +219,48 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     refreshCurrentArrivals(),
     refreshAlerts(),
   ])
-  if (!arrivals) return
+
+  // Another navigation started while we were fetching — discard this result.
+  if (displaySeq !== seq) return
 
   const alerts = getCachedAlerts()
-  const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
+  const bodyText = renderBody(station, arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) }, currentIndex, stations.length, alerts)
   lastBodyText = bodyText
   await updateBody(bodyText)
 }
 
 async function refreshInPlace(): Promise<void> {
+  // Prevent concurrent refreshes from overlapping.
+  if (isRefreshing) return
+  isRefreshing = true
+
+  const seq = ++displaySeq
   const station = currentStation()
-  if (!station) return
+  if (!station) { isRefreshing = false; return }
 
-  const [arrivals] = await Promise.all([
-    refreshCurrentArrivals(),
-    refreshAlerts(),
-  ])
-  if (!arrivals) return
+  try {
+    const [arrivals] = await Promise.all([
+      refreshCurrentArrivals(),
+      refreshAlerts(),
+    ])
 
-  const { stations, currentIndex } = getState()
-  const alerts = getCachedAlerts()
-  const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
-  await updateHeader(renderHeader(station, isFavorite(station.id)))
-  lastBodyText = bodyText
+    // Navigation occurred mid-refresh — discard stale result.
+    if (displaySeq !== seq) return
 
-  // If user was in alert view, refresh that too
-  if (isAlertView) {
-    await updateBody(renderAlertSummary(arrivals, alerts))
-  } else {
-    await updateBody(bodyText)
+    const { stations, currentIndex } = getState()
+    const alerts = getCachedAlerts()
+    const bodyText = renderBody(station, arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) }, currentIndex, stations.length, alerts)
+    await updateHeader(renderHeader(station, isFavorite(station.id)))
+    lastBodyText = bodyText
+
+    // If user was in alert view, refresh that too
+    if (isAlertView && arrivals) {
+      await updateBody(renderAlertSummary(arrivals, alerts))
+    } else {
+      await updateBody(bodyText)
+    }
+  } finally {
+    isRefreshing = false
   }
 }
 
@@ -285,6 +292,14 @@ function stopAutoRefresh(): void {
   }
 }
 
+// ── Shared background/disconnect handler ──
+// onForegroundExit and onAbnormalExit perform identical cleanup.
+function handleBackground(): void {
+  clearExitConfirm()
+  isAlertView = false
+  stopAutoRefresh()
+}
+
 // ── Glasses mode startup ──
 
 async function startGlassesMode(b: EvenAppBridge): Promise<void> {
@@ -305,11 +320,12 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   }
 
   if (station) {
+    const seq = ++displaySeq
     const [arrivals] = await Promise.all([
       refreshCurrentArrivals(),
       refreshAlerts(),
     ])
-    if (arrivals) {
+    if (arrivals && displaySeq === seq) {
       const { stations, currentIndex } = getState()
       const alerts = getCachedAlerts()
       const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
@@ -318,7 +334,9 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
     }
   }
 
-  setupInput(b, {
+  // Store the unsub handle so re-entry is safe (teardown before re-registering).
+  if (inputUnsub) inputUnsub()
+  inputUnsub = setupInput(b, {
 
     onScrollDown: async () => {
       if (exitConfirmPending) {
@@ -399,17 +417,9 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       startAutoRefresh()
     },
 
-    onForegroundExit: () => {
-      clearExitConfirm()
-      isAlertView = false
-      stopAutoRefresh()
-    },
+    onForegroundExit: handleBackground,
 
-    onAbnormalExit: () => {
-      clearExitConfirm()
-      isAlertView = false
-      stopAutoRefresh()
-    },
+    onAbnormalExit: handleBackground,
   })
 
   await startAutoRefresh()

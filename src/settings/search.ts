@@ -4,10 +4,11 @@
  * Now with fuzzy matching: abbreviation normalization, ordinal handling, and word-order tolerance.
  */
 
-import stationsData from '../data/stations.json'
+import { allStations, stationById } from '../data/stations'
 import type { Station } from '../lib/types'
 
-const allStations = stationsData as Station[]
+/** Minimum query length before alias matching kicks in, to avoid over-eager matches. */
+const MIN_ALIAS_QUERY_LEN = 3
 
 /**
  * Search aliases — common names that differ from official MTA station names.
@@ -80,11 +81,11 @@ function expandAbbreviations(word: string): string[] {
  */
 function fuzzyMatch(queryWords: string[], stationName: string): boolean {
   const normalizedStation = normalize(stationName)
-  
+
   return queryWords.every((queryWord) => {
     // Expand query word to include abbreviation variants
     const variants = expandAbbreviations(queryWord)
-    
+
     // Check if any variant appears in the station name
     return variants.some((variant) => normalizedStation.includes(variant))
   })
@@ -92,7 +93,8 @@ function fuzzyMatch(queryWords: string[], stationName: string): boolean {
 
 /**
  * Search stations by name (fuzzy matching with abbreviation normalization).
- * Also checks search aliases for common alternate names.
+ * Alias matching only activates at MIN_ALIAS_QUERY_LEN chars to avoid
+ * over-eager matches on very short prefixes.
  * Returns up to `limit` results.
  */
 export function searchStations(
@@ -104,13 +106,16 @@ export function searchStations(
   const results: Station[] = []
   const addedIds = new Set<string>()
 
-  // Check aliases first (exact substring matching for aliases)
-  for (const alias of SEARCH_ALIASES) {
-    if (alias.keywords.some((kw) => kw.includes(q) || q.includes(kw))) {
-      const s = allStations.find((st) => st.id === alias.stationId)
-      if (s && !addedIds.has(s.id)) {
-        results.push(s)
-        addedIds.add(s.id)
+  // Check aliases — require a minimum length to avoid over-eager matches on
+  // short prefixes (e.g. "p" matching "penn station" alias).
+  if (q.length >= MIN_ALIAS_QUERY_LEN) {
+    for (const alias of SEARCH_ALIASES) {
+      if (alias.keywords.some((kw) => kw.includes(q) || q.includes(kw))) {
+        const s = allStations.find((st) => st.id === alias.stationId)
+        if (s && !addedIds.has(s.id)) {
+          results.push(s)
+          addedIds.add(s.id)
+        }
       }
     }
   }
@@ -122,7 +127,7 @@ export function searchStations(
   // Fuzzy search by station name
   for (const s of allStations) {
     if (addedIds.has(s.id)) continue
-    
+
     // Try exact substring match first (fast path)
     if (s.name.toLowerCase().includes(q)) {
       results.push(s)
@@ -130,7 +135,7 @@ export function searchStations(
       if (results.length >= limit) break
       continue
     }
-    
+
     // Fall back to fuzzy match with abbreviation expansion and word-order tolerance
     if (fuzzyMatch(queryWords, s.name)) {
       results.push(s)
@@ -138,13 +143,13 @@ export function searchStations(
       if (results.length >= limit) break
     }
   }
-  
+
   return results
 }
 
 /**
- * Get a station by ID.
+ * Get a station by ID — O(1) lookup via centralised stationById map.
  */
 export function getStation(id: string): Station | undefined {
-  return allStations.find((s) => s.id === id)
+  return stationById.get(id)
 }

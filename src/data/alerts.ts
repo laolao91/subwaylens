@@ -86,7 +86,7 @@ export async function fetchAlerts(): Promise<Map<string, RouteAlert[]>> {
         const routeId = e.routeId
         if (!routeId) continue
         const existing = result.get(routeId) ?? []
-        // Only add one alert per route (most relevant = first)
+        // Only add one alert per route (first encountered in feed order)
         if (existing.length === 0) {
           existing.push({ routeId, headerText })
           result.set(routeId, existing)

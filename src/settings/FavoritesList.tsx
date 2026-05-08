@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { EmptyState } from 'even-toolkit/web'
 import { getStation } from './search'
 import { RouteBadges } from './RouteBadge'
@@ -10,14 +10,42 @@ interface FavoritesListProps {
 }
 
 export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesListProps) {
+  // State drives rendering; refs hold the latest values for async event handlers
+  // so mouseup/mousemove closures always see current indices without nested setState.
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [floatY, setFloatY] = useState(0)
+
+  const dragIndexRef = useRef<number | null>(null)
+  const dragOverIndexRef = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const touchStartY = useRef(0)
   const itemRects = useRef<DOMRect[]>([])
   const isDragging = useRef(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Track window-level listeners so we can clean up if the component unmounts mid-drag.
+  const mouseListenersRef = useRef<{
+    move: (e: MouseEvent) => void
+    up: () => void
+  } | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (mouseListenersRef.current) {
+        window.removeEventListener('mousemove', mouseListenersRef.current.move)
+        window.removeEventListener('mouseup', mouseListenersRef.current.up)
+      }
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    }
+  }, [])
+
+  const setDragState = useCallback((idx: number | null, overIdx: number | null) => {
+    dragIndexRef.current = idx
+    dragOverIndexRef.current = overIdx
+    setDragIndex(idx)
+    setDragOverIndex(overIdx)
+  }, [])
 
   const snapshotRects = useCallback(() => {
     if (!containerRef.current) return
@@ -41,10 +69,9 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
       next.splice(toIdx, 0, moved)
       onReorder(next)
     }
-    setDragIndex(null)
-    setDragOverIndex(null)
+    setDragState(null, null)
     isDragging.current = false
-  }, [favoriteIds, onReorder])
+  }, [favoriteIds, onReorder, setDragState])
 
   const onTouchStart = useCallback((e: React.TouchEvent, idx: number) => {
     const target = e.target as HTMLElement
@@ -54,8 +81,7 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
     const isHandle = !!target.closest('[data-drag-handle]')
     const startDrag = () => {
       snapshotRects()
-      setDragIndex(idx)
-      setDragOverIndex(idx)
+      setDragState(idx, idx)
       setFloatY(touch.clientY)
       isDragging.current = true
     }
@@ -65,7 +91,7 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
     } else {
       longPressTimer.current = setTimeout(startDrag, 300)
     }
-  }, [snapshotRects])
+  }, [snapshotRects, setDragState])
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0]
@@ -76,56 +102,61 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
       }
       return
     }
-    if (!isDragging.current || dragIndex === null) return
+    if (!isDragging.current || dragIndexRef.current === null) return
     e.preventDefault()
     setFloatY(touch.clientY)
-    setDragOverIndex(getHoverIndex(touch.clientY))
-  }, [dragIndex, getHoverIndex])
+    const newOver = getHoverIndex(touch.clientY)
+    dragOverIndexRef.current = newOver
+    setDragOverIndex(newOver)
+  }, [getHoverIndex])
 
   const onTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-    if (isDragging.current && dragIndex !== null && dragOverIndex !== null) {
-      finishDrag(dragIndex, dragOverIndex)
+    const fromIdx = dragIndexRef.current
+    const toIdx = dragOverIndexRef.current
+    if (isDragging.current && fromIdx !== null && toIdx !== null) {
+      finishDrag(fromIdx, toIdx)
     } else {
-      setDragIndex(null)
-      setDragOverIndex(null)
+      setDragState(null, null)
       isDragging.current = false
     }
-  }, [dragIndex, dragOverIndex, finishDrag])
+  }, [finishDrag, setDragState])
 
   const onMouseDown = useCallback((e: React.MouseEvent, idx: number) => {
     const target = e.target as HTMLElement
     if (!target.closest('[data-drag-handle]')) return
     e.preventDefault()
     snapshotRects()
-    setDragIndex(idx)
-    setDragOverIndex(idx)
+    setDragState(idx, idx)
     setFloatY(e.clientY)
     isDragging.current = true
+
     const onMouseMove = (me: MouseEvent) => {
       setFloatY(me.clientY)
-      setDragOverIndex(getHoverIndex(me.clientY))
+      const newOver = getHoverIndex(me.clientY)
+      dragOverIndexRef.current = newOver
+      setDragOverIndex(newOver)
     }
     const onMouseUp = () => {
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
-      setDragIndex((fromIdx) => {
-        setDragOverIndex((toIdx) => {
-          if (fromIdx !== null && toIdx !== null) {
-            finishDrag(fromIdx, toIdx)
-          }
-          return null
-        })
-        return null
-      })
-      isDragging.current = false
+      mouseListenersRef.current = null
+      const fromIdx = dragIndexRef.current
+      const toIdx = dragOverIndexRef.current
+      if (fromIdx !== null && toIdx !== null) {
+        finishDrag(fromIdx, toIdx)
+      } else {
+        setDragState(null, null)
+        isDragging.current = false
+      }
     }
+    mouseListenersRef.current = { move: onMouseMove, up: onMouseUp }
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
-  }, [snapshotRects, getHoverIndex, finishDrag])
+  }, [snapshotRects, getHoverIndex, finishDrag, setDragState])
 
   if (favoriteIds.length === 0) {
     return (

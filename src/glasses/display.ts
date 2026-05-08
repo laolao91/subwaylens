@@ -32,15 +32,22 @@ const CHARS_PER_LINE = 38
 const TERMINAL_WIDTH = 15
 
 /**
- * Get the current time as a short H:MMa/p string for the header clock.
+ * Format a Date as a compact H:MMa/p string (e.g. "10:24a", "3:07p").
+ * Used for both the live header clock and the last-refreshed timestamp.
  */
-function getCurrentTimeStr(): string {
-  const d = new Date()
-  const h = d.getHours()
-  const m = d.getMinutes().toString().padStart(2, '0')
+function formatClockTime(date: Date): string {
+  const h = date.getHours()
+  const m = date.getMinutes().toString().padStart(2, '0')
   const hour12 = h % 12 || 12
   const ampm = h < 12 ? 'a' : 'p'
   return `${hour12}:${m}${ampm}`
+}
+
+/**
+ * Get the current time as a short H:MMa/p string for the header clock.
+ */
+function getCurrentTimeStr(): string {
+  return formatClockTime(new Date())
 }
 
 /**
@@ -48,7 +55,7 @@ function getCurrentTimeStr(): string {
  * Shows station name + favorite star + live clock on the right.
  */
 export function renderHeader(station: Station, isFavorite: boolean): string {
-  const star = isFavorite ? ' \u2605' : ''
+  const star = isFavorite ? ' ★' : ''
   const timeStr = getCurrentTimeStr()
   const name = station.name
   const maxNameLen = CHARS_PER_LINE - star.length - 1 - timeStr.length
@@ -64,7 +71,7 @@ export function renderHeader(station: Station, isFavorite: boolean): string {
  * time column starts at a consistent horizontal position.
  * Appends '!' to route badge if the route has an active alert.
  *
- * Format: "▶[R!] Terminal_name__  Nm H:MM"
+ * Format: "▶[R!] Terminal_name__  Nm - H:MM"
  */
 function formatTrainLine(
   arrival: TrainArrival,
@@ -82,7 +89,7 @@ function formatTrainLine(
     : raw.padEnd(TERMINAL_WIDTH, ' ')
 
   const soon = isArrivingSoon(arrival.arrivalTime, now)
-  const marker = soon ? '\u25B6' : ' '
+  const marker = soon ? '▶' : ' '
 
   const left = `${marker}${badge} ${terminal}`
   const gap = Math.max(1, CHARS_PER_LINE - left.length - time.length)
@@ -140,7 +147,7 @@ export function renderBody(
   // North direction
   const northTrains = arrivals.north.slice(0, MAX_TRAINS)
   const northLabel = directionLabel(northTrains, station.north)
-  lines.push(`\u25B2 ${northLabel}`)
+  lines.push(`▲ ${northLabel}`)
 
   const northBorough = getBoroughCode(northLabel)
   if (northBorough) lines.push(northBorough)
@@ -154,12 +161,12 @@ export function renderBody(
   }
 
   // Solid heavy divider between directions
-  lines.push('\u2501'.repeat(CHARS_PER_LINE))
+  lines.push('━'.repeat(CHARS_PER_LINE))
 
   // South direction
   const southTrains = arrivals.south.slice(0, MAX_TRAINS)
   const southLabel = directionLabel(southTrains, station.south)
-  lines.push(`\u25BC ${southLabel}`)
+  lines.push(`▼ ${southLabel}`)
 
   const southBorough = getBoroughCode(southLabel)
   if (southBorough) lines.push(southBorough)
@@ -181,19 +188,14 @@ export function renderBody(
       Math.round((barTotal * (stationIndex + 1)) / totalStations)
     )
     const empty = barTotal - filled
-    const bar = '\u2501'.repeat(filled) + '\u2500'.repeat(empty)
+    const bar = '━'.repeat(filled) + '─'.repeat(empty)
     lines.push(bar + ' ' + pos)
   }
 
   // Control hint — changes when alerts exist for this station's routes
   const routeIds = routeIdsFromArrivals(arrivals)
   const hasAlerts = routeIds.some(id => routeHasAlert(alerts, id))
-  const fetchTime = new Date(arrivals.fetchedAt * 1000)
-  const fh = fetchTime.getHours()
-  const fm = fetchTime.getMinutes().toString().padStart(2, '0')
-  const fHour12 = fh % 12 || 12
-  const fAmpm = fh < 12 ? 'a' : 'p'
-  const fetchStr = `${fHour12}:${fm}${fAmpm}`
+  const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
   lines.push(hasAlerts ? `${fetchStr}  tap:alerts  dbl:exit` : `${fetchStr}  tap:refresh  dbl:exit`)
 
   return lines.join('\n')
@@ -210,7 +212,7 @@ export function renderAlertSummary(
 ): string {
   const lines: string[] = []
   lines.push('! SERVICE ALERTS')
-  lines.push('\u2501'.repeat(CHARS_PER_LINE))
+  lines.push('━'.repeat(CHARS_PER_LINE))
 
   const routeIds = routeIdsFromArrivals(arrivals)
   const activeAlerts = alertsForRoutes(alerts, routeIds).slice(0, 4)
@@ -236,7 +238,7 @@ export function renderAlertSummary(
     }
   }
 
-  lines.push('\u2501'.repeat(CHARS_PER_LINE))
+  lines.push('━'.repeat(CHARS_PER_LINE))
   lines.push('tap:trains  dbl:exit')
 
   return lines.join('\n')

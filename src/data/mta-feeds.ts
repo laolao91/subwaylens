@@ -2,22 +2,21 @@
  * MTA GTFS-RT feed fetcher and protobuf decoder.
  *
  * Uses gtfs-realtime-bindings to decode protobuf (handles NYCT wire type 6 extensions).
- * Falls back to mock data when feeds aren't reachable (simulator testing).
+ * Each feed fetch has an 8-second AbortController timeout matching the alerts feed,
+ * so a hung MTA endpoint cannot block the refresh indefinitely.
  */
 
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings'
 import { feedUrlsForRoutes } from './feed-urls'
-import stationsData from './stations.json'
+import { stopIdToStation } from './stations'
 import type { Station, TrainArrival, StationArrivals } from '../lib/types'
 
-const stations = stationsData as Station[]
+const FEED_TIMEOUT_MS = 8000
 
-// Build stop ID -> station name lookup
+// Build stop ID -> station name lookup from the centralised stations map
 const stopIdToName = new Map<string, string>()
-for (const s of stations) {
-  for (const sid of s.stops) {
-    stopIdToName.set(sid, s.name)
-  }
+for (const [sid, station] of stopIdToStation) {
+  stopIdToName.set(sid, station.name)
 }
 
 /**
@@ -41,24 +40,32 @@ function resolveStopName(stopId: string): string {
 
 /**
  * Fetch and decode a single GTFS-RT feed.
+ * Aborts after FEED_TIMEOUT_MS to prevent hung requests blocking the refresh cycle.
  */
 async function fetchFeed(
   url: string
 ): Promise<GtfsRealtimeBindings.transit_realtime.IFeedEntity[]> {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`Feed ${response.status}: ${url}`)
-  const buffer = await response.arrayBuffer()
-  const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
-    new Uint8Array(buffer)
-  )
-  return feed.entity || []
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error(`Feed ${response.status}: ${url}`)
+    const buffer = await response.arrayBuffer()
+    const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
+      new Uint8Array(buffer)
+    )
+    return feed.entity || []
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 /**
- * Fetch arrivals for a specific station.
+ * Fetch arrivals for a station.
  * Fetches only the feeds relevant to the station's routes.
+ * Returns empty directions on any failure — no mock/fake data.
  */
-export async function fetchStationArrivals(
+export async function getStationArrivals(
   station: Station
 ): Promise<StationArrivals> {
   const now = Math.floor(Date.now() / 1000)
@@ -75,7 +82,7 @@ export async function fetchStationArrivals(
   const stationStopIds = new Set(station.stops)
 
   try {
-    // Fetch all relevant feeds in parallel
+    // Fetch all relevant feeds in parallel; individual failures return []
     const entityArrays = await Promise.all(
       urls.map((url) =>
         fetchFeed(url).catch(() => {
@@ -133,25 +140,4 @@ export async function fetchStationArrivals(
   }
 
   return result
-}
-
-
-/**
- * Fetch arrivals for a station.
- * Returns empty directions on failure — no mock/fake data.
- */
-export async function getStationArrivals(
-  station: Station
-): Promise<StationArrivals> {
-  try {
-    return await fetchStationArrivals(station)
-  } catch (err) {
-    console.warn('Feed fetch failed:', err)
-    return {
-      stationId: station.id,
-      north: [],
-      south: [],
-      fetchedAt: Math.floor(Date.now() / 1000),
-    }
-  }
 }

@@ -16,8 +16,11 @@ All four must stay in sync:
 |------|-------|---------|
 | `package.json` | `"version"` | `"1.5.0"` |
 | `app.json` | `"version"` | `"1.5.0"` |
-| `src/settings/SettingsApp.tsx` | Footer string | `v1.5.0` |
+| `src/lib/version.ts` | Re-exports `pkg.version` | _(auto-synced)_ |
+| `src/settings/SettingsApp.tsx` | `v{APP_VERSION}` footer | _(reads from version.ts)_ |
 | `CHANGELOG.md` | Section header | `## v1.5.0 — 2026-04-11` |
+
+> **Note (v1.5.4+):** `src/settings/SettingsApp.tsx` no longer contains a hardcoded version string. It imports `APP_VERSION` from `src/lib/version.ts`, which in turn reads `package.json` at build time. Only `package.json`, `app.json`, and `CHANGELOG.md` need manual updates on each release.
 
 ## Git tags
 
@@ -48,6 +51,7 @@ For testing builds before a release, use pre-release identifiers:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5.4 | 2026-05-02 | Reliability and code-quality: race condition fix, feed fetch timeouts, centralised station data, extracted helpers, drag cleanup, version wired to package.json. |
 | 1.5.3 | 2026-04-18 | Dependency maintenance: SDK 0.0.10, CLI 0.1.12, protobufjs security fix, npm 11.12.1. |
 | 1.5.2 | 2026-04-14 | Handle ABNORMAL_EXIT_EVENT to stop auto-refresh on unexpected disconnect. |
 | 1.5.1 | 2026-04-11 | Header clock now updates on every auto-refresh cycle. |

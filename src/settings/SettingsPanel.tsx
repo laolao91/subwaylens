@@ -36,7 +36,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
             options={REFRESH_OPTIONS}
             value={String(settings.refreshInterval)}
             onValueChange={(val) =>
-              onChange({ ...settings, refreshInterval: parseInt(val, 10) })
+              onChange({ ...settings, refreshInterval: Number(val) })
             }
             size="small"
             className="w-full"
@@ -67,7 +67,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
               options={RADIUS_OPTIONS}
               value={String(settings.nearbyRadius)}
               onValueChange={(val) =>
-                onChange({ ...settings, nearbyRadius: parseFloat(val) })
+                onChange({ ...settings, nearbyRadius: Number(val) })
               }
               size="small"
               className="w-full"

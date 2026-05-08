@@ -1,12 +1,12 @@
 /**
  * Time formatting helpers for glasses display.
  *
- * Format: "Nm H:MM" — compact form saves ~4 chars per train line.
+ * Format: "Nm - H:MM" — compact form saves ~4 chars per train line.
  * "NOW H:MM" shown when a train is under 1 minute away.
  */
 
 /**
- * Format an arrival as "Nm H:MM" (e.g. "3m 10:24").
+ * Format an arrival as "Nm - H:MM" (e.g. "3m - 10:24").
  * Returns "NOW H:MM" if less than 1 minute away.
  */
 export function formatArrival(arrivalTime: number, now?: number): string {
