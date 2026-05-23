@@ -1,3 +1,27 @@
+## v1.6.0 — 2026-05-23
+
+Feature release: instant station switching, live phone preview, per-station route filters, delay + stale indicators, and a full unit test suite.
+
+### Glasses Display
+
+- **Instant station switching (warm cache)** — SubwayLens now prefetches arrivals for all favorite stations in parallel on startup and whenever the app returns to the foreground. Scrolling to a new station shows cached data immediately with no "Loading..." flash. Fresh data arrives in the background and updates the display automatically.
+- **Per-train delay indicator** — when the MTA GTFS-RT feed reports a trip is running behind schedule (>60s delay), the terminal name is replaced with "+Xm late" so you can see at a glance which trains to wait for and which to skip.
+- **Stale data warning** — when the last successful data fetch is more than 2 minutes old (e.g., a slow MTA endpoint), the footer line changes to "! Xm old  tap:refresh" so you know not to trust the arrival times blindly.
+
+### Phone Settings
+
+- **Per-station route filter** — each station row in "My Stations" now shows tappable route badges. Tap a badge to hide that route from the glasses display (badge fades to 25% opacity). Hidden routes are stored per station and respected instantly. Useful at multi-line stations where you only ever take one route (e.g., only the 4/5 at a 4/5/6 station).
+- **Live glasses preview** — a new "Glasses Preview" section shows a real-time simulation of exactly what your G2 glasses are currently displaying. Fetches live MTA data from the phone and renders using the same layout engine as the glasses. Auto-refreshes on the configured interval. Station picker lets you preview any favorite.
+
+### Reliability & Performance
+
+- **Bundle code splitting** — Vite now splits the build into three chunks: app code, vendor-react, and vendor-gtfs (protobuf/GTFS bindings). The GTFS chunk loads in parallel with the main bundle, reducing time-to-interactive on the Android phone settings page.
+- **Alert severity ordering** — service alerts are now sorted by severity before caching: NO_SERVICE alerts appear before REDUCED_SERVICE, SIGNIFICANT_DELAYS, etc. The most disruptive alert for a route is always shown first.
+- **Search alias matching tightened** — alias keywords now require `startsWith` matching (was `includes`). Searching "bar" correctly matches "barclays" but no longer matches unrelated results that happen to contain "bar" mid-word.
+- **Unit test suite** — added Vitest with 33 tests across `time.ts`, `geo.ts`, `search.ts`, and `display.ts`. Covers edge cases including near-midnight arrival formatting, haversine distance, alias min-length guard, and renderer output shape.
+
+---
+
 ## v1.5.4 — 2026-05-02
 
 Code-quality and reliability release. No new user-visible features — all changes are under the hood.

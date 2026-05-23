@@ -16,7 +16,13 @@ export interface RouteAlert {
   routeId: string
   /** Short header text, already truncated for display */
   headerText: string
+  /** GTFS-RT effect enum value — lower = more severe (NO_SERVICE=1, REDUCED_SERVICE=2, ...) */
+  effect: number
 }
+
+// GTFS-RT Alert.Effect enum values for severity sorting
+const EFFECT_NO_SERVICE = 1
+const EFFECT_UNKNOWN = 8
 
 /** Cache: last fetched alerts per route */
 let cachedAlerts: Map<string, RouteAlert[]> = new Map()
@@ -80,18 +86,27 @@ export async function fetchAlerts(): Promise<Map<string, RouteAlert[]>> {
       const headerText =
         rawHeader.length > 60 ? rawHeader.slice(0, 59) + '.' : rawHeader
 
-      // Map to affected routes
+      const effect = Number(alert.effect ?? EFFECT_UNKNOWN)
+
+      // Map to affected routes — collect all alerts per route, sort by severity later
       const entities = alert.informedEntity ?? []
       for (const e of entities) {
         const routeId = e.routeId
         if (!routeId) continue
         const existing = result.get(routeId) ?? []
-        // Only add one alert per route (first encountered in feed order)
-        if (existing.length === 0) {
-          existing.push({ routeId, headerText })
-          result.set(routeId, existing)
-        }
+        existing.push({ routeId, headerText, effect })
+        result.set(routeId, existing)
       }
+    }
+
+    // Sort each route's alerts: NO_SERVICE first, then by ascending effect value
+    for (const [routeId, list] of result) {
+      list.sort((a, b) => {
+        if (a.effect === EFFECT_NO_SERVICE && b.effect !== EFFECT_NO_SERVICE) return -1
+        if (b.effect === EFFECT_NO_SERVICE && a.effect !== EFFECT_NO_SERVICE) return 1
+        return a.effect - b.effect
+      })
+      result.set(routeId, list)
     }
 
     cachedAlerts = result

@@ -116,12 +116,18 @@ export async function getStationArrivals(
           const arrTime = Number(stu.arrival?.time || stu.departure?.time || 0)
           if (arrTime === 0 || arrTime < now - 30) continue
 
+          // Stop-level delay preferred over trip-level; absent when on time
+          const stopDelay = Number(stu.arrival?.delay ?? stu.departure?.delay ?? 0)
+          const tripDelay = Number((tu as any).delay ?? 0)
+          const delaySecs = stopDelay || tripDelay
+
           const arrival: TrainArrival = {
             route: routeId,
             direction,
             stopId: fullStopId,
             arrivalTime: arrTime,
             terminal: terminalName,
+            delay: delaySecs > 0 ? delaySecs : undefined,
           }
 
           if (direction === 'N') {

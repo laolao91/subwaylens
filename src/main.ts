@@ -29,6 +29,9 @@ import {
   refreshCurrentArrivals,
   refreshAlerts,
   getCachedAlerts,
+  getCachedArrivals,
+  prefetchAllStations,
+  applyRouteFilter,
   isFavorite,
   getState,
 } from './glasses/stations'
@@ -207,24 +210,44 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   }
 
   const headerText = renderHeader(station, isFavorite(station.id))
+  const cached = getCachedArrivals(station.id)
+  const alerts = getCachedAlerts()
 
-  if (useRebuild) {
-    await rebuildPage(headerText, renderLoading())
+  // Show cached data immediately (no Loading... flicker) when available,
+  // then refresh in the background and update once fresh data arrives.
+  if (cached) {
+    const filtered = applyRouteFilter(cached, station.id)
+    const initialBody = renderBody(station, filtered, currentIndex, stations.length, alerts)
+    lastBodyText = initialBody
+    if (useRebuild) {
+      await rebuildPage(headerText, initialBody)
+    } else {
+      await updateHeader(headerText)
+      await updateBody(initialBody)
+    }
   } else {
-    await updateHeader(headerText)
-    await updateBody(renderLoading())
+    if (useRebuild) {
+      await rebuildPage(headerText, renderLoading())
+    } else {
+      await updateHeader(headerText)
+      await updateBody(renderLoading())
+    }
   }
 
+  // Fetch fresh data; abort if navigation moved on while we were fetching.
   const [arrivals] = await Promise.all([
     refreshCurrentArrivals(),
     refreshAlerts(),
   ])
 
-  // Another navigation started while we were fetching — discard this result.
   if (displaySeq !== seq) return
 
-  const alerts = getCachedAlerts()
-  const bodyText = renderBody(station, arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) }, currentIndex, stations.length, alerts)
+  const freshAlerts = getCachedAlerts()
+  const filtered = applyRouteFilter(
+    arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
+    station.id
+  )
+  const bodyText = renderBody(station, filtered, currentIndex, stations.length, freshAlerts)
   lastBodyText = bodyText
   await updateBody(bodyText)
 }
@@ -249,11 +272,14 @@ async function refreshInPlace(): Promise<void> {
 
     const { stations, currentIndex } = getState()
     const alerts = getCachedAlerts()
-    const bodyText = renderBody(station, arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) }, currentIndex, stations.length, alerts)
+    const filtered = applyRouteFilter(
+      arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
+      station.id
+    )
+    const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts)
     await updateHeader(renderHeader(station, isFavorite(station.id)))
     lastBodyText = bodyText
 
-    // If user was in alert view, refresh that too
     if (isAlertView && arrivals) {
       await updateBody(renderAlertSummary(arrivals, alerts))
     } else {
@@ -320,17 +346,19 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   }
 
   if (station) {
+    // Warm the cache for all favorites in parallel, then paint from cache.
     const seq = ++displaySeq
-    const [arrivals] = await Promise.all([
-      refreshCurrentArrivals(),
-      refreshAlerts(),
-    ])
-    if (arrivals && displaySeq === seq) {
+    await Promise.all([prefetchAllStations(), refreshAlerts()])
+    if (displaySeq === seq) {
       const { stations, currentIndex } = getState()
       const alerts = getCachedAlerts()
-      const bodyText = renderBody(station, arrivals, currentIndex, stations.length, alerts)
-      lastBodyText = bodyText
-      await updateBody(bodyText)
+      const cached = getCachedArrivals(station.id)
+      if (cached) {
+        const filtered = applyRouteFilter(cached, station.id)
+        const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts)
+        lastBodyText = bodyText
+        await updateBody(bodyText)
+      }
     }
   }
 
@@ -367,7 +395,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
       const station = currentStation()
       const cachedArrivals = station
-        ? getState().arrivals.get(station.id) ?? null
+        ? getCachedArrivals(station.id)
         : null
       const alerts = getCachedAlerts()
 
@@ -381,7 +409,6 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       const hasAlerts = routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0)
 
       if (hasAlerts && cachedArrivals) {
-        // Toggle between arrivals and alert summary
         isAlertView = !isAlertView
         if (isAlertView) {
           await updateBody(renderAlertSummary(cachedArrivals, alerts))
@@ -389,7 +416,6 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
           await updateBody(lastBodyText)
         }
       } else {
-        // No alerts — tap refreshes as before
         isAlertView = false
         refreshInPlace()
       }
@@ -413,7 +439,12 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
     onForegroundEnter: () => {
       isAlertView = false
-      loadStations().then(() => displayCurrentStation(true))
+      loadStations().then(() => {
+        // Warm cache for all stations before displaying, then display current.
+        Promise.all([prefetchAllStations(), refreshAlerts()]).then(() =>
+          displayCurrentStation(true)
+        )
+      })
       startAutoRefresh()
     },
 

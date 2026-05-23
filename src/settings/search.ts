@@ -110,7 +110,7 @@ export function searchStations(
   // short prefixes (e.g. "p" matching "penn station" alias).
   if (q.length >= MIN_ALIAS_QUERY_LEN) {
     for (const alias of SEARCH_ALIASES) {
-      if (alias.keywords.some((kw) => kw.includes(q) || q.includes(kw))) {
+      if (alias.keywords.some((kw) => kw.startsWith(q))) {
         const s = allStations.find((st) => st.id === alias.stationId)
         if (s && !addedIds.has(s.id)) {
           results.push(s)

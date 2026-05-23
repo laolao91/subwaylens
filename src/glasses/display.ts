@@ -78,8 +78,10 @@ export function renderHeader(station: Station, isFavorite: boolean): string {
  * Terminal name always padded/truncated to TERMINAL_WIDTH chars so the
  * time column starts at a consistent horizontal position.
  * Appends '!' to route badge if the route has an active alert.
+ * Shows "+Xm late" instead of terminal name when GTFS-RT reports a delay > 60s.
  *
  * Format: "▶[R!] Terminal_name__  Nm - H:MM"
+ *    or:  " [R!] +3m late______   Nm - H:MM"
  */
 function formatTrainLine(
   arrival: TrainArrival,
@@ -90,16 +92,25 @@ function formatTrainLine(
   const badge = hasAlert ? `[${arrival.route}!]` : `[${arrival.route}]`
   const time = formatArrival(arrival.arrivalTime, now)
 
-  // Abbreviation lookup first, then fixed-width pad/truncate
-  const raw = TERMINAL_ABBREVS[arrival.terminal] ?? arrival.terminal
-  const terminal = raw.length > TERMINAL_WIDTH
-    ? raw.slice(0, TERMINAL_WIDTH - 1) + '.'
-    : raw.padEnd(TERMINAL_WIDTH, ' ')
+  let terminalDisplay: string
+  if (arrival.delay && arrival.delay > 60) {
+    const delayMins = Math.round(arrival.delay / 60)
+    const raw = `+${delayMins}m late`
+    terminalDisplay = raw.length > TERMINAL_WIDTH
+      ? raw.slice(0, TERMINAL_WIDTH - 1) + '.'
+      : raw.padEnd(TERMINAL_WIDTH, ' ')
+  } else {
+    // Abbreviation lookup first, then fixed-width pad/truncate
+    const raw = TERMINAL_ABBREVS[arrival.terminal] ?? arrival.terminal
+    terminalDisplay = raw.length > TERMINAL_WIDTH
+      ? raw.slice(0, TERMINAL_WIDTH - 1) + '.'
+      : raw.padEnd(TERMINAL_WIDTH, ' ')
+  }
 
   const soon = isArrivingSoon(arrival.arrivalTime, now)
   const marker = soon ? '▶' : ' '
 
-  const left = `${marker}${badge} ${terminal}`
+  const left = `${marker}${badge} ${terminalDisplay}`
   const gap = Math.max(1, CHARS_PER_LINE - left.length - time.length)
   return left + ' '.repeat(gap) + time
 }
@@ -201,11 +212,19 @@ export function renderBody(
 
   }
 
-  // Control hint — changes when alerts exist for this station's routes
+  // Footer: stale warning when data is > 2 min old; otherwise normal control hint.
   const routeIds = routeIdsFromArrivals(arrivals)
   const hasAlerts = routeIds.some(id => routeHasAlert(alerts, id))
-  const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
-  lines.push(hasAlerts ? `${fetchStr}  tap:alerts  dbl:exit` : `${fetchStr}  tap:refresh  dbl:exit`)
+  const ageSecs = Math.floor(Date.now() / 1000) - arrivals.fetchedAt
+  if (ageSecs > 120) {
+    const ageMin = Math.floor(ageSecs / 60)
+    lines.push(hasAlerts
+      ? `! ${ageMin}m old  tap:alerts  dbl:exit`
+      : `! ${ageMin}m old  tap:refresh  dbl:exit`)
+  } else {
+    const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
+    lines.push(hasAlerts ? `${fetchStr}  tap:alerts  dbl:exit` : `${fetchStr}  tap:refresh  dbl:exit`)
+  }
 
   return lines.join('\n')
 }

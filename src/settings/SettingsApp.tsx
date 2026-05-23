@@ -15,10 +15,12 @@ import {
 } from '../lib/storage'
 import type { AppSettings } from '../lib/types'
 import { DEFAULT_SETTINGS } from '../lib/types'
+import { stationById } from '../data/stations'
 import { FavoritesList } from './FavoritesList'
 import { NearbyStations } from './NearbyStations'
 import { StationSearch } from './StationSearch'
 import { SettingsPanel } from './SettingsPanel'
+import { GlassesPreview } from './GlassesPreview'
 
 function SectionLabel({ children }: { children: string }) {
   return (
@@ -67,6 +69,19 @@ export function SettingsApp() {
     await saveSettings(next)
   }, [])
 
+  const handleToggleRoute = useCallback(async (stationId: string, route: string) => {
+    const current = settings.hiddenRoutes[stationId] ?? []
+    const next = current.includes(route)
+      ? current.filter((r) => r !== route)
+      : [...current, route]
+    const nextSettings: AppSettings = {
+      ...settings,
+      hiddenRoutes: { ...settings.hiddenRoutes, [stationId]: next },
+    }
+    setSettings(nextSettings)
+    await saveSettings(nextSettings)
+  }, [settings])
+
   const handleSync = useCallback(() => {
     window.dispatchEvent(new CustomEvent('subwaylens:sync'))
     setToastExiting(false)
@@ -88,6 +103,11 @@ export function SettingsApp() {
     )
   }
 
+  // Resolved Station objects for favorites (preserves order)
+  const favoriteStations = favoriteIds
+    .map((id) => stationById.get(id))
+    .filter(Boolean) as import('../lib/types').Station[]
+
   return (
     <div className="min-h-dvh bg-bg flex flex-col">
       {/* Header - sticky at top */}
@@ -103,9 +123,21 @@ export function SettingsApp() {
         <SectionLabel>My Stations</SectionLabel>
         <FavoritesList
           favoriteIds={favoriteIds}
+          hiddenRoutes={settings.hiddenRoutes}
           onReorder={handleReorder}
           onRemove={handleRemove}
+          onToggleRoute={handleToggleRoute}
         />
+
+        {favoriteStations.length > 0 && (
+          <>
+            <SectionLabel>Glasses Preview</SectionLabel>
+            <GlassesPreview
+              stations={favoriteStations}
+              settings={settings}
+            />
+          </>
+        )}
 
         {settings.nearbyEnabled && (
           <>
@@ -138,9 +170,9 @@ export function SettingsApp() {
 
       {/* Send to Glasses button - fixed at bottom */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-bg border-t border-border">
-        <Button 
-          variant="default" 
-          size="lg" 
+        <Button
+          variant="default"
+          size="lg"
           className="w-full bg-text text-bg hover:bg-text/90"
           onClick={handleSync}
         >

@@ -1,15 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { EmptyState } from 'even-toolkit/web'
 import { getStation } from './search'
-import { RouteBadges } from './RouteBadge'
+import { RouteFilter } from './RouteFilter'
 
 interface FavoritesListProps {
   favoriteIds: string[]
+  hiddenRoutes: Record<string, string[]>
   onReorder: (ids: string[]) => void
   onRemove: (id: string) => void
+  onToggleRoute: (stationId: string, route: string) => void
 }
 
-export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesListProps) {
+export function FavoritesList({ favoriteIds, hiddenRoutes, onReorder, onRemove, onToggleRoute }: FavoritesListProps) {
   // State drives rendering; refs hold the latest values for async event handlers
   // so mouseup/mousemove closures always see current indices without nested setState.
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -205,7 +207,11 @@ export function FavoritesList({ favoriteIds, onReorder, onRemove }: FavoritesLis
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] tracking-[-0.15px] text-text">{station.name}</div>
-                <RouteBadges routes={station.routes} />
+                <RouteFilter
+                  routes={station.routes}
+                  hiddenRoutes={hiddenRoutes[station.id] ?? []}
+                  onToggle={(route) => onToggleRoute(station.id, route)}
+                />
               </div>
               <button
                 data-delete-btn

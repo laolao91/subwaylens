@@ -9,7 +9,7 @@ import { getStationArrivals } from '../data/mta-feeds'
 import { fetchAlerts } from '../data/alerts'
 import { getFavorites, getSettings } from '../lib/storage'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
-import type { Station, StationArrivals } from '../lib/types'
+import type { Station, StationArrivals, AppSettings } from '../lib/types'
 import type { RouteAlert } from '../data/alerts'
 
 export interface StationManagerState {
@@ -33,6 +33,10 @@ let state: StationManagerState = {
   alerts: new Map(),
 }
 
+// Cached settings so route-filter lookups don't require async reads on every display call.
+// Updated whenever loadStations() runs.
+let cachedSettings: AppSettings | null = null
+
 /**
  * Returns a shallow copy of state so callers cannot accidentally mutate
  * the top-level fields. Note: arrivals and alerts Maps are still shared
@@ -48,6 +52,7 @@ export function getState(): StationManagerState {
 export async function loadStations(): Promise<void> {
   const favIds = await getFavorites()
   const settings = await getSettings()
+  cachedSettings = settings
   state.favoriteIds = new Set(favIds)
 
   // Start with favorites in saved order
@@ -142,6 +147,48 @@ export function getCachedArrivals(
   stationId: string
 ): StationArrivals | null {
   return state.arrivals.get(stationId) || null
+}
+
+/**
+ * Prefetch arrivals for all active stations in parallel and populate the cache.
+ * Called on startup and on foreground re-enter so scroll is instant (no Loading...).
+ * Individual station failures are swallowed — they'll be retried on next refresh.
+ */
+export async function prefetchAllStations(): Promise<void> {
+  if (state.stations.length === 0) return
+  await Promise.all(
+    state.stations.map(async (station) => {
+      try {
+        const arrivals = await getStationArrivals(station)
+        state.arrivals.set(station.id, arrivals)
+      } catch {
+        // Silently skip — stale or empty cache is fine
+      }
+    })
+  )
+}
+
+/**
+ * Return a copy of arrivals with hidden routes filtered out for the given station.
+ */
+export function applyRouteFilter(
+  arrivals: StationArrivals,
+  stationId: string
+): StationArrivals {
+  const hidden = new Set(cachedSettings?.hiddenRoutes?.[stationId] ?? [])
+  if (hidden.size === 0) return arrivals
+  return {
+    ...arrivals,
+    north: arrivals.north.filter((t) => !hidden.has(t.route)),
+    south: arrivals.south.filter((t) => !hidden.has(t.route)),
+  }
+}
+
+/**
+ * Get the set of hidden route IDs for a station (from cached settings).
+ */
+export function getHiddenRouteSet(stationId: string): Set<string> {
+  return new Set(cachedSettings?.hiddenRoutes?.[stationId] ?? [])
 }
 
 /**

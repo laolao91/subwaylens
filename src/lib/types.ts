@@ -17,6 +17,7 @@ export interface TrainArrival {
   stopId: string       // full stop ID e.g. "A03N"
   arrivalTime: number  // Unix timestamp (seconds)
   terminal: string     // last stop name
+  delay?: number       // seconds behind schedule (from GTFS-RT, absent when on time)
 }
 
 /** Arrivals grouped for a station */
@@ -32,10 +33,12 @@ export interface AppSettings {
   refreshInterval: number  // seconds (15, 30, 60, 120)
   nearbyEnabled: boolean
   nearbyRadius: number     // miles (0.1, 0.25, 0.5, 1.0)
+  hiddenRoutes: Record<string, string[]>  // stationId → route IDs to hide on glasses
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   refreshInterval: 30,
   nearbyEnabled: true,
   nearbyRadius: 0.25,
+  hiddenRoutes: {},
 }
