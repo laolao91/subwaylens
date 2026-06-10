@@ -1,3 +1,38 @@
+## v1.7.0 — 2026-06-09
+
+Feature release: LIRR + Metro-North departure boards, multi-city support, and a performance overhaul of feed fetching.
+
+### New: Commuter Rail (LIRR + Metro-North)
+
+- **Departure boards** — LIRR and Metro-North stations show a single time-sorted departure list with branch badges ([RONK], [BABY]), delay notices, and **track numbers** extracted from the MTA Railroad GTFS-RT extension (dim "Trk --" until posted, ~10 min before departure).
+- Penn Station, Grand Central, Jamaica, and 235+ other commuter rail stations are searchable and favoritable alongside subway stations in the NYC region.
+
+### New: Multi-city
+
+- **Transit region picker** in settings — one region active at a time. All feeds keyless:
+  - SF Bay Area (BART)
+  - Boston (MBTA subway, light rail + Commuter Rail)
+  - Philadelphia (SEPTA Regional Rail)
+  - Denver (RTD rail lines)
+  - Atlanta (MARTA rail)
+  - Minneapolis-St Paul (METRO)
+- Station packs load per-region via code-split chunks — a Boston user never downloads the Denver data.
+- **Adaptive refresh floor** — heavy feeds (MBTA/MSP/MARTA, ≥500KB per fetch) enforce a 60s minimum refresh to cap cellular data usage.
+
+### Performance & Reliability
+
+- **Feed-level fetch dedupe + 10s TTL cache** — stations sharing a GTFS-RT feed no longer trigger duplicate downloads/decodes; prefetch of N favorites on one feed costs one fetch instead of N.
+- Refresh-interval setting changes now apply immediately (was: required app restart).
+- Auto-refresh no longer cancels in-flight station-switch renders (duplicate fetch eliminated).
+- Exiting the alert view re-renders from cache so the footer timestamp is current.
+- Route-filter storage no longer accumulates empty entries.
+
+### Internals
+
+- Multi-system architecture: TransitSystem registry, direction-id strategy for standard GTFS, stop-suffix strategy for MTA subway.
+- Station pack generator (scripts/generate-stations.mjs) builds packs from any static GTFS zip.
+- Protobuf fixture tests for arrivals parsing and LIRR track extraction (49 tests, up from 30).
+
 ## v1.6.2 — 2026-06-09
 
 Bug fix release.
