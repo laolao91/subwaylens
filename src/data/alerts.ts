@@ -118,6 +118,12 @@ export async function fetchAlerts(): Promise<Map<string, RouteAlert[]>> {
   }
 }
 
+/** Test hook: reset the module-level cache. */
+export function clearAlertsCache(): void {
+  cachedAlerts = new Map()
+  lastFetchedAt = 0
+}
+
 /**
  * Check if a given route has an active alert.
  */
