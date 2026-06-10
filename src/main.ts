@@ -415,6 +415,24 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   window.addEventListener('subwaylens:sync', () => {
     loadStations().then(() => displayCurrentStation(true))
   })
+
+  // Nearby stations resolved in the background (GPS append) — prefetch
+  // their arrivals, then re-render from cache so the progress bar picks
+  // up the new station count. Light-touch: no nav reset, no alert-view exit.
+  window.addEventListener('subwaylens:stations-updated', () => {
+    prefetchAllStations().then(() => {
+      if (isAlertView) return
+      const station = currentStation()
+      if (!station) return
+      const cached = getCachedArrivals(station.id)
+      if (!cached) return
+      const { stations, currentIndex } = getState()
+      const filtered = applyRouteFilter(cached, station.id)
+      const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
+      lastBodyText = bodyText
+      updateBody(bodyText)
+    })
+  })
 }
 
 // ── Boot ──

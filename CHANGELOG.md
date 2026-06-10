@@ -1,3 +1,11 @@
+## v1.6.2 — 2026-06-09
+
+Bug fix release.
+
+### Glasses Display
+
+- **Favorites display no longer waits on GPS** — `loadStations()` previously awaited a GPS fix (up to 10 seconds on a cold Android lock) before rebuilding the station list, delaying redisplay of favorite stations that don't need location at all. Favorites now publish immediately; nearby stations resolve in the background and append when ready, triggering a light cache-based re-render (progress bar updates to the new station count, no nav reset, no alert-view exit).
+
 ## v1.6.0 — 2026-05-23
 
 Feature release: instant station switching, live phone preview, per-station route filters, delay + stale indicators, and a full unit test suite.

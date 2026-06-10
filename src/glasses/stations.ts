@@ -47,7 +47,12 @@ export function getState(): StationManagerState {
 }
 
 /**
- * Load favorites and nearby stations, rebuilding the station list.
+ * Load favorites and rebuild the station list. Favorites are published
+ * immediately — the display must never wait on GPS. Nearby stations
+ * (when enabled) resolve in the background: a cold Android GPS fix can
+ * take 10+ seconds, and blocking on it delayed redisplay of favorites
+ * that don't need GPS at all. When nearby stations arrive, the
+ * 'subwaylens:stations-updated' event fires so the display can re-render.
  */
 export async function loadStations(): Promise<void> {
   const favIds = await getFavorites()
@@ -62,25 +67,37 @@ export async function loadStations(): Promise<void> {
     if (s) stationList.push(s)
   }
 
-  // Add nearby stations if enabled
-  if (settings.nearbyEnabled) {
-    const pos = await getCurrentPosition()
-    if (pos) {
-      const nearby = nearbyStations(pos, allStations, settings.nearbyRadius)
-      for (const { station } of nearby) {
-        // Don't duplicate favorites
-        if (!state.favoriteIds.has(station.id)) {
-          stationList.push(station)
-        }
-      }
-    }
-  }
-
   state.stations = stationList
+  clampIndex()
 
-  // Clamp current index
-  if (state.currentIndex >= stationList.length) {
-    state.currentIndex = Math.max(0, stationList.length - 1)
+  // Nearby stations append in the background — never awaited here.
+  if (settings.nearbyEnabled) {
+    void appendNearbyStations(settings.nearbyRadius)
+  }
+}
+
+/**
+ * Resolve GPS and append in-radius stations to the active list.
+ * Skips favorites and anything already present (guards against a second
+ * loadStations() racing a still-in-flight append). Notifies listeners
+ * via 'subwaylens:stations-updated' only when the list actually grew.
+ */
+async function appendNearbyStations(radiusMiles: number): Promise<void> {
+  const pos = await getCurrentPosition()
+  if (!pos) return
+  const nearby = nearbyStations(pos, allStations, radiusMiles)
+  const existing = new Set(state.stations.map((s) => s.id))
+  const additions = nearby
+    .map(({ station }) => station)
+    .filter((s) => !state.favoriteIds.has(s.id) && !existing.has(s.id))
+  if (additions.length === 0) return
+  state.stations = [...state.stations, ...additions]
+  window.dispatchEvent(new CustomEvent('subwaylens:stations-updated'))
+}
+
+function clampIndex(): void {
+  if (state.currentIndex >= state.stations.length) {
+    state.currentIndex = Math.max(0, state.stations.length - 1)
   }
 }
 
