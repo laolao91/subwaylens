@@ -22,7 +22,7 @@ import { getBoroughCode } from '../data/boroughs'
 import type { RouteAlert } from '../data/alerts'
 import { alertsForRoutes, routeHasAlert } from '../data/alerts'
 import { getSystem } from '../data/systems'
-import { routeDisplayName } from '../data/arrivals'
+import { routeDisplayName } from '../data/pack-registry'
 
 /** Max trains per direction to show */
 const MAX_TRAINS = 3

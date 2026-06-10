@@ -17,38 +17,15 @@
 
 import { fetchFeedWithRawCached, type FeedEntity } from './feed-cache'
 import { extractTrackMap } from './railroad-track'
-import { getSystem, registerSystemRouteFilter } from './systems'
+import { getSystem } from './systems'
+import { systemStopNames } from './pack-registry'
 import { getStationArrivals as getSubwayArrivals } from './mta-feeds'
 import type { Station, TrainArrival, StationArrivals } from '../lib/types'
 
-// ── Per-system lookup tables (populated by pack loading) ──
-
-export interface StationPack {
-  system: string
-  routeDisplay: Record<string, string>
-  stations: Station[]
-}
-
-const stopNameBySystem = new Map<string, Map<string, string>>()
-const routeDisplayBySystem = new Map<string, Record<string, string>>()
-
-/** Register a loaded pack's lookup tables. Idempotent. */
-export function registerSystemPack(pack: StationPack): void {
-  const stopNames = new Map<string, string>()
-  for (const st of pack.stations) {
-    for (const sid of st.stops) stopNames.set(sid, st.name)
-  }
-  stopNameBySystem.set(pack.system, stopNames)
-  routeDisplayBySystem.set(pack.system, pack.routeDisplay)
-  // Mixed bus+rail feeds (MBTA, MSP): the pack's rail route set becomes
-  // the runtime filter.
-  registerSystemRouteFilter(pack.system, Object.keys(pack.routeDisplay))
-}
-
-/** Display label for a route ID within a system (falls back to the raw ID). */
-export function routeDisplayName(systemId: string, routeId: string): string {
-  return routeDisplayBySystem.get(systemId)?.[routeId] ?? routeId
-}
+// Pack registration and display lookups live in pack-registry.ts (leaf
+// module — avoids the stations→arrivals→mta-feeds→stations cycle).
+// Re-exported here for compatibility with existing imports.
+export { registerSystemPack, routeDisplayName, type StationPack } from './pack-registry'
 
 // ── Dispatcher ──
 
@@ -76,7 +53,7 @@ async function getStandardArrivals(
   }
 
   const stationStopIds = new Set(station.stops)
-  const stopNames = stopNameBySystem.get(systemId)
+  const stopNames = systemStopNames(systemId)
 
   try {
     const feeds = await Promise.all(

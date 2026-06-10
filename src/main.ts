@@ -44,6 +44,7 @@ import {
 } from './glasses/display'
 import { setupInput } from './glasses/input'
 import { getSettings } from './lib/storage'
+import { getSystem } from './data/systems'
 import { initSettingsPage } from './settings/settings-mount'
 
 // ── Container IDs ──
@@ -303,9 +304,16 @@ async function renderCurrentFromCache(): Promise<boolean> {
 async function startAutoRefresh(): Promise<void> {
   stopAutoRefresh()
   const settings = await getSettings()
+  // Heavy feeds (MBTA/MSP/MARTA, ≥500KB per fetch) enforce a refresh
+  // floor so the default 15-30s cadence can't burn ~1.5MB/min cellular.
+  const systemFloor = Math.max(
+    0,
+    ...getState().stations.map((s) => getSystem(s.system).minRefreshSecs)
+  )
+  const intervalSecs = Math.max(settings.refreshInterval, systemFloor)
   refreshTimer = setInterval(() => {
     refreshInPlace()
-  }, settings.refreshInterval * 1000)
+  }, intervalSecs * 1000)
 }
 
 function stopAutoRefresh(): void {

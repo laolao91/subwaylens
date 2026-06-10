@@ -15,7 +15,7 @@ import {
 } from '../lib/storage'
 import type { AppSettings } from '../lib/types'
 import { DEFAULT_SETTINGS } from '../lib/types'
-import { stationById } from '../data/stations'
+import { stationById, loadRegionStations } from '../data/stations'
 import { FavoritesList } from './FavoritesList'
 import { NearbyStations } from './NearbyStations'
 import { StationSearch } from './StationSearch'
@@ -42,6 +42,9 @@ export function SettingsApp() {
   useEffect(() => {
     async function load() {
       const [favs, s] = await Promise.all([getFavorites(), getSettings()])
+      // Load the active region's station packs before first render so
+      // search, nearby, and favorite resolution see the right stations.
+      await loadRegionStations(s.regionId)
       setFavoriteIds(favs)
       setSettings(s)
       setLoading(false)
@@ -65,9 +68,16 @@ export function SettingsApp() {
   }, [])
 
   const handleSettingsChange = useCallback(async (next: AppSettings) => {
+    const regionChanged = next.regionId !== settings.regionId
     setSettings(next)
     await saveSettings(next)
-  }, [])
+    if (regionChanged) {
+      // Swap station packs, then force a re-render so search/nearby/favorites
+      // reflect the new region (the station collections mutate in place).
+      await loadRegionStations(next.regionId)
+      setFavoriteIds((ids) => [...ids])
+    }
+  }, [settings.regionId])
 
   const handleToggleRoute = useCallback(async (stationId: string, route: string) => {
     const current = settings.hiddenRoutes[stationId] ?? []

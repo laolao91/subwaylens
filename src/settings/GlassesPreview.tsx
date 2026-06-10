@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { getStationArrivals } from '../data/mta-feeds'
+import { getStationArrivals } from '../data/arrivals'
 import { fetchAlerts } from '../data/alerts'
 import { renderHeader, renderBody } from '../glasses/display'
 import { applyRouteFilter } from '../glasses/stations'

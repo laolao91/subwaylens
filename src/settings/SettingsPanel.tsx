@@ -6,6 +6,7 @@
 
 import { SegmentedControl, Toggle, SettingsGroup } from 'even-toolkit/web'
 import type { AppSettings } from '../lib/types'
+import { REGIONS } from '../data/systems'
 
 interface SettingsPanelProps {
   settings: AppSettings
@@ -29,6 +30,32 @@ const RADIUS_OPTIONS = [
 export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
   return (
     <div className="flex flex-col gap-3">
+      {/* Transit Region */}
+      <SettingsGroup label="Transit region">
+        <div className="bg-surface rounded-[6px] divide-y divide-border">
+          {REGIONS.map((region) => {
+            const active = settings.regionId === region.id
+            return (
+              <button
+                key={region.id}
+                type="button"
+                onClick={() => onChange({ ...settings, regionId: region.id })}
+                className="w-full flex items-center justify-between px-4 py-3 text-left"
+              >
+                <span className={`text-[15px] tracking-[-0.15px] ${active ? 'text-text' : 'text-text-dim'}`}>
+                  {region.name}
+                </span>
+                {active && <span className="text-[15px] text-text">✓</span>}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-[12px] tracking-[-0.12px] text-text-dim mt-2 px-1">
+          One region at a time. Favorites from other regions are kept and
+          reappear when you switch back.
+        </p>
+      </SettingsGroup>
+
       {/* Refresh Interval */}
       <SettingsGroup label="Refresh interval">
         <div className="bg-surface p-4 rounded-[6px]">

@@ -4,8 +4,8 @@
  * Manages the active station list (favorites + nearby GPS stations),
  * cycling between them, and fetching arrivals.
  */
-import { allStations, stationById } from '../data/stations'
-import { getStationArrivals } from '../data/mta-feeds'
+import { allStations, stationById, loadRegionStations } from '../data/stations'
+import { getStationArrivals } from '../data/arrivals'
 import { fetchAlerts } from '../data/alerts'
 import { getFavorites, getSettings } from '../lib/storage'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
@@ -59,6 +59,11 @@ export async function loadStations(): Promise<void> {
   const settings = await getSettings()
   cachedSettings = settings
   state.favoriteIds = new Set(favIds)
+
+  // Make sure the active region's station packs are loaded before
+  // resolving favorite IDs. Favorites from other regions simply don't
+  // resolve and are skipped (they reappear when the region switches back).
+  await loadRegionStations(settings.regionId)
 
   // Start with favorites in saved order
   const stationList: Station[] = []
