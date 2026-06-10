@@ -104,3 +104,40 @@ describe('renderBody — departure board (LIRR)', () => {
     expect(text).toContain('No live data')
   })
 })
+
+// ── Schedule fallback ──
+
+describe('renderBody — schedule fallback (NYC subway, no live data)', () => {
+  const SUBWAY_STATION: Station = {
+    id: '127',
+    name: 'Times Sq-42 St',
+    stops: ['127'],
+    routes: ['1', '2', '3'],
+    lat: 40.75,
+    lng: -73.98,
+    north: 'Uptown',
+    south: 'Downtown',
+  }
+
+  it('shows sched estimates and warning footer when feed is empty', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const empty: StationArrivals = { stationId: '127', north: [], south: [], fetchedAt: now }
+    const text = renderBody(SUBWAY_STATION, empty, 0, 1, new Map())
+    // 1/2/3 trains run ~all hours; the table should produce estimates.
+    expect(text).toContain('(sched)')
+    expect(text).toContain('! sched est.')
+  })
+
+  it('keeps plain No live data for non-subway systems', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const bartStation: Station = {
+      id: 'bart:EMBR', system: 'bart', name: 'Embarcadero',
+      stops: ['M16-1'], routes: ['1'], lat: 37.79, lng: -122.4,
+      north: 'Antioch', south: 'Daly City',
+    }
+    const empty: StationArrivals = { stationId: 'bart:EMBR', north: [], south: [], fetchedAt: now }
+    const text = renderBody(bartStation, empty, 0, 1, new Map())
+    expect(text).toContain('No live data')
+    expect(text).not.toContain('(sched)')
+  })
+})
