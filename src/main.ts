@@ -244,7 +244,10 @@ async function refreshInPlace(): Promise<void> {
   if (isRefreshing) return
   isRefreshing = true
 
-  const seq = ++displaySeq
+  // Capture (don't bump) the sequence — a refresh is not a navigation.
+  // Bumping here used to cancel in-flight displayCurrentStation() renders,
+  // forcing a redundant duplicate fetch (review bug #2).
+  const seq = displaySeq
   const station = currentStation()
   if (!station) { isRefreshing = false; return }
 
@@ -277,13 +280,22 @@ async function refreshInPlace(): Promise<void> {
   }
 }
 
-async function restoreNormalDisplay(): Promise<void> {
-  isAlertView = false
-  if (lastBodyText) {
-    await updateBody(lastBodyText)
-  } else {
-    await refreshInPlace()
-  }
+/**
+ * Re-render the current station's body from cached arrivals.
+ * Light-touch: no fetch, no nav reset. Returns false when there is
+ * nothing cached to render (caller may fall back to a refresh).
+ */
+async function renderCurrentFromCache(): Promise<boolean> {
+  const station = currentStation()
+  if (!station) return false
+  const cached = getCachedArrivals(station.id)
+  if (!cached) return false
+  const { stations, currentIndex } = getState()
+  const filtered = applyRouteFilter(cached, station.id)
+  const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
+  lastBodyText = bodyText
+  await updateBody(bodyText)
+  return true
 }
 
 // ── Auto-refresh ──
@@ -381,7 +393,10 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
         if (isAlertView) {
           await updateBody(renderAlertSummary(cachedArrivals, alerts))
         } else {
-          await updateBody(lastBodyText)
+          // Re-render from cache so the footer timestamp is current
+          // (replaying lastBodyText verbatim showed a stale clock — bug #5).
+          const rendered = await renderCurrentFromCache()
+          if (!rendered) await updateBody(lastBodyText)
         }
       } else {
         isAlertView = false
@@ -414,6 +429,9 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
   window.addEventListener('subwaylens:sync', () => {
     loadStations().then(() => displayCurrentStation(true))
+    // Settings may have changed the refresh interval — restart the timer
+    // so the new cadence applies immediately (review bug #1).
+    startAutoRefresh()
   })
 
   // Nearby stations resolved in the background (GPS append) — prefetch
@@ -422,15 +440,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   window.addEventListener('subwaylens:stations-updated', () => {
     prefetchAllStations().then(() => {
       if (isAlertView) return
-      const station = currentStation()
-      if (!station) return
-      const cached = getCachedArrivals(station.id)
-      if (!cached) return
-      const { stations, currentIndex } = getState()
-      const filtered = applyRouteFilter(cached, station.id)
-      const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
-      lastBodyText = bodyText
-      updateBody(bodyText)
+      renderCurrentFromCache()
     })
   })
 }

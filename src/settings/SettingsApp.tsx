@@ -74,10 +74,15 @@ export function SettingsApp() {
     const next = current.includes(route)
       ? current.filter((r) => r !== route)
       : [...current, route]
-    const nextSettings: AppSettings = {
-      ...settings,
-      hiddenRoutes: { ...settings.hiddenRoutes, [stationId]: next },
+    // Drop the key entirely when no routes are hidden — otherwise stale
+    // empty arrays accumulate in storage forever.
+    const nextHidden = { ...settings.hiddenRoutes }
+    if (next.length === 0) {
+      delete nextHidden[stationId]
+    } else {
+      nextHidden[stationId] = next
     }
+    const nextSettings: AppSettings = { ...settings, hiddenRoutes: nextHidden }
     setSettings(nextSettings)
     await saveSettings(nextSettings)
   }, [settings])
