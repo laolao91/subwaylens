@@ -273,19 +273,6 @@ export function renderAlertSummary(
 }
 
 /**
- * Render the exit confirmation interstitial.
- */
-export function renderExitConfirm(): string {
-  const lines: string[] = []
-  lines.push('')
-  lines.push('  Double-tap again to exit.')
-  lines.push('')
-  lines.push('  Scroll or tap to cancel.')
-  lines.push('')
-  return lines.join('\n')
-}
-
-/**
  * Render a loading screen for the body container.
  */
 export function renderLoading(): string {

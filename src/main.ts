@@ -41,7 +41,6 @@ import {
   renderAlertSummary,
   renderLoading,
   renderNoStations,
-  renderExitConfirm,
 } from './glasses/display'
 import { setupInput } from './glasses/input'
 import { getSettings } from './lib/storage'
@@ -58,10 +57,6 @@ let bridge: EvenAppBridge | null = null
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let inputUnsub: (() => void) | null = null
 
-// ── Exit confirmation state ──
-const EXIT_CONFIRM_MS = 3000
-let exitConfirmPending = false
-let exitConfirmTimer: ReturnType<typeof setTimeout> | null = null
 let lastBodyText = ''
 
 // ── Alert view toggle state ──
@@ -79,14 +74,6 @@ let displaySeq = 0
 // Prevents concurrent auto-refreshes from overlapping if a fetch takes
 // longer than the configured interval.
 let isRefreshing = false
-
-function clearExitConfirm(): void {
-  exitConfirmPending = false
-  if (exitConfirmTimer) {
-    clearTimeout(exitConfirmTimer)
-    exitConfirmTimer = null
-  }
-}
 
 // ── Glasses display helpers ──
 
@@ -305,9 +292,7 @@ async function startAutoRefresh(): Promise<void> {
   stopAutoRefresh()
   const settings = await getSettings()
   refreshTimer = setInterval(() => {
-    if (!exitConfirmPending) {
-      refreshInPlace()
-    }
+    refreshInPlace()
   }, settings.refreshInterval * 1000)
 }
 
@@ -321,7 +306,6 @@ function stopAutoRefresh(): void {
 // ── Shared background/disconnect handler ──
 // onForegroundExit and onAbnormalExit perform identical cleanup.
 function handleBackground(): void {
-  clearExitConfirm()
   isAlertView = false
   stopAutoRefresh()
 }
@@ -367,32 +351,16 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   inputUnsub = setupInput(b, {
 
     onScrollDown: async () => {
-      if (exitConfirmPending) {
-        clearExitConfirm()
-        await restoreNormalDisplay()
-        return
-      }
       nextStation()
       displayCurrentStation(true)
     },
 
     onScrollUp: async () => {
-      if (exitConfirmPending) {
-        clearExitConfirm()
-        await restoreNormalDisplay()
-        return
-      }
       prevStation()
       displayCurrentStation(true)
     },
 
     onTap: async () => {
-      if (exitConfirmPending) {
-        clearExitConfirm()
-        await restoreNormalDisplay()
-        return
-      }
-
       const station = currentStation()
       const cachedArrivals = station
         ? getCachedArrivals(station.id)
@@ -422,19 +390,8 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
     },
 
     onDoubleTap: async () => {
-      if (exitConfirmPending) {
-        clearExitConfirm()
-        stopAutoRefresh()
-        await b.shutDownPageContainer(0)
-      } else {
-        exitConfirmPending = true
-        await updateBody(renderExitConfirm())
-        exitConfirmTimer = setTimeout(async () => {
-          exitConfirmPending = false
-          exitConfirmTimer = null
-          await restoreNormalDisplay()
-        }, EXIT_CONFIRM_MS)
-      }
+      stopAutoRefresh()
+      await b.shutDownPageContainer(1)
     },
 
     onForegroundEnter: () => {

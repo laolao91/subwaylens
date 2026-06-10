@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from 'even-toolkit/web'
-import { getCurrentPosition, nearbyStations } from '../lib/geo'
+import { getCurrentPositionDetailed, nearbyStations } from '../lib/geo'
 import { RouteBadges } from './RouteBadge'
 import { allStations } from '../data/stations'
 import type { Station } from '../lib/types'
@@ -21,8 +21,9 @@ interface NearbyStationsProps {
 type GpsState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'denied' }
-  | { status: 'unavailable' }
+  | { status: 'denied' }      // PERMISSION_DENIED (may fire spuriously on Android)
+  | { status: 'unavailable' } // no GPS hardware or network location
+  | { status: 'timeout' }     // device didn't respond in time
   | { status: 'done'; results: Array<{ station: Station; distance: number }> }
 
 export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbyStationsProps) {
@@ -36,9 +37,17 @@ export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbySt
       return
     }
 
-    const pos = await getCurrentPosition()
-    if (!pos) {
+    const pos = await getCurrentPositionDetailed()
+    if (pos === 'permission-denied') {
       setGpsState({ status: 'denied' })
+      return
+    }
+    if (pos === 'unavailable') {
+      setGpsState({ status: 'unavailable' })
+      return
+    }
+    if (pos === 'timeout') {
+      setGpsState({ status: 'timeout' })
       return
     }
 
@@ -74,6 +83,34 @@ export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbySt
         <p className="text-[15px] tracking-[-0.15px] text-text-dim">
           Location services not available on this device.
         </p>
+        <p className="text-[13px] tracking-[-0.13px] text-text-dim mt-2">
+          Make sure location services are enabled in device settings.
+        </p>
+        <button
+          onClick={detect}
+          className="mt-3 text-[14px] tracking-[-0.14px] text-accent cursor-pointer bg-transparent border-0"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  if (gpsState.status === 'timeout') {
+    return (
+      <div className="bg-surface rounded-[6px] p-6 text-center">
+        <p className="text-[15px] tracking-[-0.15px] text-text-dim">
+          Location request timed out.
+        </p>
+        <p className="text-[13px] tracking-[-0.13px] text-text-dim mt-2">
+          Check your location settings and try again.
+        </p>
+        <button
+          onClick={detect}
+          className="mt-3 text-[14px] tracking-[-0.14px] text-accent cursor-pointer bg-transparent border-0"
+        >
+          Retry
+        </button>
       </div>
     )
   }
@@ -82,10 +119,10 @@ export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbySt
     return (
       <div className="bg-surface rounded-[6px] p-6 text-center">
         <p className="text-[15px] tracking-[-0.15px] text-text-dim">
-          Location access was denied.
+          Location permission required.
         </p>
         <p className="text-[13px] tracking-[-0.13px] text-text-dim mt-2">
-          Enable location in your browser or device settings, then tap Retry.
+          If you've already granted it, try force-quitting and reopening the EvenHub app.
         </p>
         <button
           onClick={detect}

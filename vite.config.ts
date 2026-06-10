@@ -1,9 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      // Replace @protobufjs/inquire with a no-op stub. The real module uses
+      // eval() to dynamically require() optional Node.js modules — that path
+      // is never reached in a bundled browser build, but the EvenHub static
+      // scanner flags any eval() in the bundle regardless.
+      '@protobufjs/inquire': path.resolve(__dirname, 'src/lib/inquire-stub.ts'),
+    },
+  },
   server: {
     host: true,
     port: 5173,

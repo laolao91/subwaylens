@@ -50,22 +50,46 @@ export function nearbyStations(
 }
 
 /**
- * Get current GPS position. Returns null if unavailable or denied.
+ * Error codes from a failed geolocation request.
+ * 'permission-denied': user denied OR (on Android) the EvenHub WebView didn't
+ *   forward the host app's location permission. Prompting the user to
+ *   force-quit and reopen often resolves it on sideloaded builds.
+ * 'unavailable': GPS hardware or network location unavailable.
+ * 'timeout': device didn't return a fix within the timeout window.
  */
-export function getCurrentPosition(): Promise<LatLng | null> {
+export type GeoError = 'permission-denied' | 'unavailable' | 'timeout'
+
+/**
+ * Get current GPS position with typed error. maximumAge:60000 allows the
+ * device to return a cached fix rather than waiting for a fresh GPS lock —
+ * critical on Android where a cold GPS can take 10+ seconds.
+ */
+export function getCurrentPositionDetailed(): Promise<LatLng | GeoError> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      resolve(null)
+      resolve('unavailable')
       return
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude })
       },
-      () => {
-        resolve(null)
+      (err) => {
+        if (err.code === 1 /* PERMISSION_DENIED */) resolve('permission-denied')
+        else if (err.code === 2 /* POSITION_UNAVAILABLE */) resolve('unavailable')
+        else resolve('timeout')
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
     )
   })
+}
+
+/**
+ * Get current GPS position. Returns null if unavailable or denied.
+ * Used by the glasses-side loader where errors are silently ignored.
+ */
+export function getCurrentPosition(): Promise<LatLng | null> {
+  return getCurrentPositionDetailed().then((r) =>
+    typeof r === 'string' ? null : r
+  )
 }
