@@ -16,11 +16,13 @@
  */
 
 import type { Station, StationArrivals, TrainArrival } from '../lib/types'
-import { formatArrival, isArrivingSoon } from '../lib/time'
+import { formatArrival, isArrivingSoon, minutesUntil } from '../lib/time'
 import { TERMINAL_ABBREVS } from '../data/terminal-abbrevs'
 import { getBoroughCode } from '../data/boroughs'
 import type { RouteAlert } from '../data/alerts'
 import { alertsForRoutes, routeHasAlert } from '../data/alerts'
+import { getSystem } from '../data/systems'
+import { routeDisplayName } from '../data/arrivals'
 
 /** Max trains per direction to show */
 const MAX_TRAINS = 3
@@ -65,7 +67,11 @@ function getCurrentTimeStr(): string {
 export function renderHeader(station: Station, isFavorite: boolean): string {
   const star = isFavorite ? ' ★' : ''
   const timeStr = getCurrentTimeStr()
-  const name = station.name
+  // Commuter-rail stations get a system tag so "Penn Station" is
+  // unambiguously the LIRR vs MNR board.
+  const system = getSystem(station.system)
+  const tag = system.layout === 'departure-board' ? ` ${system.id.toUpperCase()}` : ''
+  const name = station.name + tag
   const maxNameLen = CHARS_PER_LINE - star.length - 1 - timeStr.length
   const displayName =
     name.length > maxNameLen ? name.slice(0, maxNameLen - 2) + '..' : name
@@ -160,11 +166,23 @@ export function renderBody(
   totalStations: number,
   alerts: Map<string, RouteAlert[]>
 ): string {
+  const system = getSystem(station.system)
+  if (system.layout === 'departure-board') {
+    return renderDepartureBoard(station, arrivals, stationIndex, totalStations)
+  }
+
   const now = Math.floor(Date.now() / 1000)
   const lines: string[] = []
 
+  // Non-subway directional systems carry route IDs that need display
+  // mapping (e.g. MBTA "Green-B" stays, but MSP "901" → "Blue").
+  const mapRoute = (t: TrainArrival): TrainArrival =>
+    station.system && station.system !== 'nyc-subway'
+      ? { ...t, route: routeDisplayName(station.system, t.route) }
+      : t
+
   // North direction
-  const northTrains = arrivals.north.slice(0, MAX_TRAINS)
+  const northTrains = arrivals.north.slice(0, MAX_TRAINS).map(mapRoute)
   const northLabel = directionLabel(northTrains, station.north)
   lines.push(`▲ ${northLabel}`)
 
@@ -183,7 +201,7 @@ export function renderBody(
   lines.push('━'.repeat(DIVIDER_WIDTH))
 
   // South direction
-  const southTrains = arrivals.south.slice(0, MAX_TRAINS)
+  const southTrains = arrivals.south.slice(0, MAX_TRAINS).map(mapRoute)
   const southLabel = directionLabel(southTrains, station.south)
   lines.push(`▼ ${southLabel}`)
 
@@ -224,6 +242,97 @@ export function renderBody(
   } else {
     const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
     lines.push(hasAlerts ? `${fetchStr}  tap:alerts  dbl:exit` : `${fetchStr}  tap:refresh  dbl:exit`)
+  }
+
+  return lines.join('\n')
+}
+
+// ── Departure board (commuter rail: LIRR / Metro-North) ──
+
+/** Max departures shown on a departure board (single list, no direction split). */
+const MAX_DEPARTURES = 6
+
+/** Departure-board terminal column width (narrower than subway: track column needs room). */
+const BOARD_TERMINAL_WIDTH = 12
+
+/**
+ * Abbreviate a branch/route display name to a 4-char badge.
+ * Multi-word: first letter + first 3 of second word ("Port Jefferson" → "PJEF").
+ * Single word: first 4 ("Ronkonkoma" → "RONK").
+ */
+export function branchAbbrev(display: string): string {
+  const words = display.toUpperCase().replace(/[^A-Z0-9 ]/g, '').split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '????'
+  if (words.length >= 2) return (words[0][0] + words[1].slice(0, 3))
+  return words[0].slice(0, 4)
+}
+
+/**
+ * Render the commuter-rail departure board: one time-sorted list with
+ * branch badges and track numbers. Tracks are dim "--" until the MTARR
+ * extension posts them (~10 min before departure at terminals).
+ *
+ *   DEPARTURES
+ *   ▶[RONK] Ronkonkoma   Trk 18  12m-10:36
+ *    [BABL] +4m late     Trk --  19m-10:43
+ *   ━━━━━━━━━━━━━━━ 3/5
+ *   10:23a  tap:refresh  dbl:exit
+ */
+function renderDepartureBoard(
+  station: Station,
+  arrivals: StationArrivals,
+  stationIndex: number,
+  totalStations: number
+): string {
+  const now = Math.floor(Date.now() / 1000)
+  const systemId = station.system ?? 'nyc-subway'
+  const lines: string[] = []
+
+  lines.push('DEPARTURES')
+
+  // Arrivals collection put everything in `north` for departure-board systems.
+  const departures = arrivals.north.slice(0, MAX_DEPARTURES)
+
+  if (departures.length === 0) {
+    lines.push('  No live data')
+  } else {
+    for (const t of departures) {
+      const badge = `[${branchAbbrev(routeDisplayName(systemId, t.route))}]`
+      // Delay notice replaces the terminal name, same convention as subway.
+      const rawTerminal = t.delay && t.delay > 60
+        ? `+${Math.round(t.delay / 60)}m late`
+        : t.terminal
+      const terminal = rawTerminal.length > BOARD_TERMINAL_WIDTH
+        ? rawTerminal.slice(0, BOARD_TERMINAL_WIDTH - 1) + '.'
+        : rawTerminal.padEnd(BOARD_TERMINAL_WIDTH, ' ')
+      const track = t.track ? `Trk ${t.track}`.padEnd(6, ' ').slice(0, 6) : 'Trk --'
+      const mins = minutesUntil(t.arrivalTime, now)
+      const clock = formatArrival(t.arrivalTime, now).split(' - ')[1] ?? ''
+      const time = mins === 0 ? `NOW ${clock}` : `${mins}m-${clock}`
+      const marker = isArrivingSoon(t.arrivalTime, now) ? '▶' : ' '
+
+      const left = `${marker}${badge} ${terminal} ${track}`
+      const gap = Math.max(1, CHARS_PER_LINE - left.length - time.length)
+      lines.push(left + ' '.repeat(gap) + time)
+    }
+  }
+
+  // Progress bar — same as the directional layout
+  if (totalStations > 1) {
+    const pos = `${stationIndex + 1}/${totalStations}`
+    const barTotal = DIVIDER_WIDTH - pos.length - 1
+    const filled = Math.max(1, Math.round((barTotal * (stationIndex + 1)) / totalStations))
+    const bar = '━'.repeat(filled) + '─'.repeat(barTotal - filled)
+    lines.push(bar + ' ' + pos)
+  }
+
+  // Footer — no alert toggle for railroads (alerts feed is subway-only)
+  const ageSecs = now - arrivals.fetchedAt
+  if (ageSecs > 120) {
+    lines.push(`! ${Math.floor(ageSecs / 60)}m old  tap:refresh  dbl:exit`)
+  } else {
+    const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
+    lines.push(`${fetchStr}  tap:refresh  dbl:exit`)
   }
 
   return lines.join('\n')
