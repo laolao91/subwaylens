@@ -1,14 +1,10 @@
 ## v1.7.0 — 2026-06-09
 
-Feature release: LIRR + Metro-North departure boards, multi-city support, equipment outage alerts, schedule fallback, glance mode, and a performance overhaul of feed fetching.
+Feature release: LIRR + Metro-North departure boards, multi-city support, equipment outage alerts, glance mode, and a performance overhaul of feed fetching.
 
 ### New: Equipment Outage Alerts (NYC subway)
 
 - A `!` marker appears in the header when the current station has an elevator or escalator out of service (keyless MTA outage feed, 5-min cache). Details appear as [ELEV]/[ESC] entries in the existing tap-to-view alert summary — zero arrival rows consumed.
-
-### New: Schedule Fallback (NYC subway)
-
-- When realtime feeds are down, the display shows scheduled-headway estimates per route ("[L] every ~4 min (sched)") with a "! sched est." footer instead of "No live data". Generated at build time from static GTFS (7KB table). Stateless per refresh cycle — live data resumes automatically on the next successful fetch.
 
 ### New: High Readability Glance Mode
 

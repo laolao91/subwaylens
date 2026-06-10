@@ -24,7 +24,6 @@ import { alertsForRoutes, routeHasAlert } from '../data/alerts'
 import type { EquipmentOutage } from '../data/outages'
 import { getSystem } from '../data/systems'
 import { routeDisplayName } from '../data/pack-registry'
-import { scheduledHeadway } from '../data/headways'
 
 /** Max trains per direction to show */
 const MAX_TRAINS = 3
@@ -152,26 +151,6 @@ function directionLabel(trains: TrainArrival[], fallback: string): string {
 }
 
 /**
- * Schedule-fallback lines for a direction with no live trains.
- * NYC subway only: "every ~N min (sched)" per route from the bundled
- * headway table. Returns ['  No live data'] for other systems and
- * ['  No scheduled service'] when nothing runs at this hour.
- * Stateless per render — live data replaces it on the next good fetch.
- */
-function noLiveDataLines(station: Station): { lines: string[]; usedSched: boolean } {
-  if (station.system && station.system !== 'nyc-subway') {
-    return { lines: ['  No live data'], usedSched: false }
-  }
-  const lines: string[] = []
-  for (const route of station.routes.slice(0, MAX_TRAINS)) {
-    const h = scheduledHeadway(route)
-    if (h !== null) lines.push(` [${route}] every ~${h} min (sched)`)
-  }
-  if (lines.length === 0) return { lines: ['  No scheduled service'], usedSched: false }
-  return { lines, usedSched: true }
-}
-
-/**
  * Collect all route IDs present in an arrivals object.
  */
 function routeIdsFromArrivals(arrivals: StationArrivals): string[] {
@@ -210,8 +189,6 @@ export function renderBody(
       ? { ...t, route: routeDisplayName(station.system, t.route) }
       : t
 
-  let usedSched = false
-
   // North direction
   const northTrains = arrivals.north.slice(0, MAX_TRAINS).map(mapRoute)
   const northLabel = directionLabel(northTrains, station.north)
@@ -221,9 +198,7 @@ export function renderBody(
   if (northBorough) lines.push(northBorough)
 
   if (northTrains.length === 0) {
-    const fallback = noLiveDataLines(station)
-    lines.push(...fallback.lines)
-    usedSched = usedSched || fallback.usedSched
+    lines.push('  No live data')
   } else {
     for (const t of northTrains) {
       lines.push(formatTrainLine(t, now, alerts))
@@ -242,9 +217,7 @@ export function renderBody(
   if (southBorough) lines.push(southBorough)
 
   if (southTrains.length === 0) {
-    const fallback = noLiveDataLines(station)
-    lines.push(...fallback.lines)
-    usedSched = usedSched || fallback.usedSched
+    lines.push('  No live data')
   } else {
     for (const t of southTrains) {
       lines.push(formatTrainLine(t, now, alerts))
@@ -265,16 +238,12 @@ export function renderBody(
 
   }
 
-  // Footer: schedule-fallback warning beats stale warning beats normal hint.
+  // Footer: stale warning when data is > 2 min old; otherwise normal control hint.
   // Equipment outages count as notices — they flip the hint to tap:alerts.
   const routeIds = routeIdsFromArrivals(arrivals)
   const hasAlerts = routeIds.some(id => routeHasAlert(alerts, id)) || outageCount > 0
   const ageSecs = now - arrivals.fetchedAt
-  if (usedSched) {
-    lines.push(hasAlerts
-      ? '! sched est.  tap:alerts  dbl:exit'
-      : '! sched est.  tap:refresh  dbl:exit')
-  } else if (ageSecs > 120) {
+  if (ageSecs > 120) {
     const ageMin = Math.floor(ageSecs / 60)
     lines.push(hasAlerts
       ? `! ${ageMin}m old  tap:alerts  dbl:exit`
