@@ -32,6 +32,7 @@ import {
   getCachedAlerts,
   getCachedArrivals,
   getOutagesForCurrentStation,
+  getCachedSettings,
   prefetchAllStations,
   applyRouteFilter,
   isFavorite,
@@ -40,6 +41,7 @@ import {
 import {
   renderHeader,
   renderBody,
+  renderGlanceBody,
   renderAlertSummary,
   renderLoading,
   renderNoStations,
@@ -66,6 +68,11 @@ let lastBodyText = ''
 // When alerts exist, tap switches between arrivals and alert summary.
 // Switching stations always resets to arrivals view.
 let isAlertView = false
+
+// ── Glance mode detail toggle ──
+// Only meaningful when settings.glanceMode is on. Tap cycles
+// glance → detail → (alerts if any) → glance. Navigation resets to glance.
+let isDetailView = false
 
 // ── Display sequence counter ──
 // Incremented each time a navigation or display-initiating action starts.
@@ -184,6 +191,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   // Each navigation bumps the sequence. If a slower fetch from a previous
   // station completes after we've already moved on, it checks this and aborts.
   isAlertView = false
+  isDetailView = false
   const seq = ++displaySeq
 
   const station = currentStation()
@@ -207,7 +215,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   // then refresh in the background and update once fresh data arrives.
   if (cached) {
     const filtered = applyRouteFilter(cached, station.id)
-    const initialBody = renderBody(station, filtered, currentIndex, stations.length, alerts, getOutagesForCurrentStation().length)
+    const initialBody = composeBody(station, filtered, currentIndex, stations.length, alerts)
     lastBodyText = initialBody
     if (useRebuild) {
       await rebuildPage(headerText, initialBody)
@@ -238,7 +246,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
     station.id
   )
-  const bodyText = renderBody(station, filtered, currentIndex, stations.length, freshAlerts, getOutagesForCurrentStation().length)
+  const bodyText = composeBody(station, filtered, currentIndex, stations.length, freshAlerts)
   lastBodyText = bodyText
   await updateBody(bodyText)
 }
@@ -271,7 +279,7 @@ async function refreshInPlace(): Promise<void> {
       arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
       station.id
     )
-    const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts, getOutagesForCurrentStation().length)
+    const bodyText = composeBody(station, filtered, currentIndex, stations.length, alerts)
     await updateHeader(renderHeader(station, isFavorite(station.id), getOutagesForCurrentStation().length > 0))
     lastBodyText = bodyText
 
@@ -283,6 +291,23 @@ async function refreshInPlace(): Promise<void> {
   } finally {
     isRefreshing = false
   }
+}
+
+/** True when the body should render the glance view right now. */
+function inGlanceView(): boolean {
+  return (getCachedSettings()?.glanceMode ?? false) && !isDetailView && !isAlertView
+}
+
+/** Body for the current view: glance or full detail. */
+function composeBody(
+  station: NonNullable<ReturnType<typeof currentStation>>,
+  filtered: ReturnType<typeof applyRouteFilter>,
+  currentIndex: number,
+  total: number,
+  alerts: ReturnType<typeof getCachedAlerts>
+): string {
+  if (inGlanceView()) return renderGlanceBody(station, filtered)
+  return renderBody(station, filtered, currentIndex, total, alerts, getOutagesForCurrentStation().length)
 }
 
 /**
@@ -297,7 +322,7 @@ async function renderCurrentFromCache(): Promise<boolean> {
   if (!cached) return false
   const { stations, currentIndex } = getState()
   const filtered = applyRouteFilter(cached, station.id)
-  const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts(), getOutagesForCurrentStation().length)
+  const bodyText = composeBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
   lastBodyText = bodyText
   await updateBody(bodyText)
   return true
@@ -331,6 +356,7 @@ function stopAutoRefresh(): void {
 // onForegroundExit and onAbnormalExit perform identical cleanup.
 function handleBackground(): void {
   isAlertView = false
+  isDetailView = false
   stopAutoRefresh()
 }
 
@@ -363,7 +389,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       const cached = getCachedArrivals(station.id)
       if (cached) {
         const filtered = applyRouteFilter(cached, station.id)
-        const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts, getOutagesForCurrentStation().length)
+        const bodyText = composeBody(station, filtered, currentIndex, stations.length, alerts)
         lastBodyText = bodyText
         await updateBody(bodyText)
       }
@@ -402,6 +428,27 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       const hasAlerts =
         routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0) ||
         outages.length > 0
+
+      const glanceEnabled = getCachedSettings()?.glanceMode ?? false
+
+      if (glanceEnabled) {
+        // Cycle: glance → detail → (alerts if any) → glance
+        if (isAlertView) {
+          isAlertView = false
+          isDetailView = false
+          await renderCurrentFromCache()
+        } else if (!isDetailView) {
+          isDetailView = true
+          await renderCurrentFromCache()
+        } else if (hasAlerts && cachedArrivals) {
+          isAlertView = true
+          await updateBody(renderAlertSummary(cachedArrivals, alerts, outages))
+        } else {
+          isDetailView = false
+          refreshInPlace()
+        }
+        return
+      }
 
       if (hasAlerts && cachedArrivals) {
         isAlertView = !isAlertView

@@ -239,6 +239,11 @@ export function getHiddenRouteSet(stationId: string): Set<string> {
   return new Set(cachedSettings?.hiddenRoutes?.[stationId] ?? [])
 }
 
+/** Settings snapshot from the last loadStations() — sync access for render paths. */
+export function getCachedSettings(): AppSettings | null {
+  return cachedSettings
+}
+
 /**
  * Check if a station is a favorite.
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { renderLoading, renderNoStations, renderBody, branchAbbrev } from './display'
+import { renderLoading, renderNoStations, renderBody, branchAbbrev, bigNumberRows, renderGlanceBody } from './display'
 import { registerSystemPack } from '../data/arrivals'
 import type { Station, StationArrivals } from '../lib/types'
 
@@ -139,5 +139,51 @@ describe('renderBody — schedule fallback (NYC subway, no live data)', () => {
     const text = renderBody(bartStation, empty, 0, 1, new Map())
     expect(text).toContain('No live data')
     expect(text).not.toContain('(sched)')
+  })
+})
+
+// ── Glance mode ──
+
+describe('bigNumberRows', () => {
+  it('renders digits as 3 rows of equal width', () => {
+    const rows = bigNumberRows('12')
+    expect(rows).toHaveLength(3)
+    expect(rows[0].length).toBe(rows[1].length)
+    expect(rows[1].length).toBe(rows[2].length)
+  })
+
+  it('handles the no-data placeholder', () => {
+    const rows = bigNumberRows('--')
+    expect(rows[1]).toContain('_')
+  })
+})
+
+describe('renderGlanceBody', () => {
+  const SUBWAY_STATION: Station = {
+    id: '127', name: 'Times Sq-42 St', stops: ['127'], routes: ['1'],
+    lat: 40.75, lng: -73.98, north: 'Uptown', south: 'Downtown',
+  }
+
+  it('shows both directions with big countdown and detail hint', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const arrivals: StationArrivals = {
+      stationId: '127',
+      north: [{ route: '1', direction: 'N', stopId: '127N', arrivalTime: now + 180, terminal: 'Uptown Terminal' }],
+      south: [{ route: '1', direction: 'S', stopId: '127S', arrivalTime: now + 420, terminal: 'South Ferry' }],
+      fetchedAt: now,
+    }
+    const text = renderGlanceBody(SUBWAY_STATION, arrivals)
+    expect(text).toContain('▲')
+    expect(text).toContain('▼')
+    expect(text).toContain('min')
+    expect(text).toContain('tap:detail')
+    expect(text.split('\n').length).toBeLessThanOrEqual(9)
+  })
+
+  it('shows -- when a direction has no trains', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const arrivals: StationArrivals = { stationId: '127', north: [], south: [], fetchedAt: now }
+    const text = renderGlanceBody(SUBWAY_STATION, arrivals)
+    expect(text).toContain('min')
   })
 })

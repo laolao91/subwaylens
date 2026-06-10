@@ -71,6 +71,26 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         </div>
       </SettingsGroup>
 
+      {/* Glance mode */}
+      <SettingsGroup label="Display">
+        <div className="bg-surface p-4 rounded-[6px] flex items-center justify-between">
+          <div>
+            <span className="text-[15px] tracking-[-0.15px] text-text">
+              High readability glance mode
+            </span>
+            <p className="text-[12px] tracking-[-0.12px] text-text-dim mt-0.5">
+              One giant countdown per direction. Tap glasses for detail.
+            </p>
+          </div>
+          <Toggle
+            checked={settings.glanceMode}
+            onChange={(checked) =>
+              onChange({ ...settings, glanceMode: checked })
+            }
+          />
+        </div>
+      </SettingsGroup>
+
       {/* Nearby Stations */}
       <SettingsGroup label="Nearby stations">
         <div className="bg-surface p-4 rounded-[6px] flex items-center justify-between">

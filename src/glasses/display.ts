@@ -378,6 +378,96 @@ function renderDepartureBoard(
   return lines.join('\n')
 }
 
+// ── Glance mode (high-readability big numbers) ──
+
+/**
+ * 3-row ASCII block digits. Plain ASCII (underscore/pipe/space) is the
+ * only glyph set guaranteed in the G2 LVGL font — SDK 0.0.10 exposes no
+ * per-container font size, so "big" text is built from rows.
+ */
+const DIGIT_ROWS: Record<string, [string, string, string]> = {
+  '0': [' _ ', '| |', '|_|'],
+  '1': ['   ', '  |', '  |'],
+  '2': [' _ ', ' _|', '|_ '],
+  '3': [' _ ', ' _|', ' _|'],
+  '4': ['   ', '|_|', '  |'],
+  '5': [' _ ', '|_ ', ' _|'],
+  '6': [' _ ', '|_ ', '|_|'],
+  '7': [' _ ', '  |', '  |'],
+  '8': [' _ ', '|_|', '|_|'],
+  '9': [' _ ', '|_|', ' _|'],
+  '-': ['   ', ' _ ', '   '],
+}
+
+/** Render a short string ("12", "--") as three rows of block digits. */
+export function bigNumberRows(text: string): [string, string, string] {
+  const rows: [string, string, string] = ['', '', '']
+  for (const ch of text) {
+    const glyph = DIGIT_ROWS[ch] ?? ['   ', '   ', '   ']
+    for (let i = 0; i < 3; i++) rows[i] += glyph[i] + ' '
+  }
+  return rows
+}
+
+/**
+ * Glance mode body: one giant next-train countdown per direction
+ * (or per departure list for commuter rail). 9 lines total.
+ *
+ *   ▲ Uptown [1]
+ *      _
+ *     | |  min      ← 3-row digits
+ *     |_|
+ *   ▼ Downtown [2]
+ *   ...
+ *   tap:detail  dbl:exit
+ */
+export function renderGlanceBody(
+  station: Station,
+  arrivals: StationArrivals
+): string {
+  const now = Math.floor(Date.now() / 1000)
+  const systemId = station.system ?? 'nyc-subway'
+  const system = getSystem(station.system)
+  const lines: string[] = []
+
+  const sections: Array<{ arrow: string; label: string; next?: TrainArrival }> =
+    system.layout === 'departure-board'
+      ? [{
+          arrow: '▶',
+          label: 'Next departure',
+          next: arrivals.north[0],
+        }]
+      : [
+          {
+            arrow: '▲',
+            label: directionLabel(arrivals.north.slice(0, MAX_TRAINS), station.north),
+            next: arrivals.north[0],
+          },
+          {
+            arrow: '▼',
+            label: directionLabel(arrivals.south.slice(0, MAX_TRAINS), station.south),
+            next: arrivals.south[0],
+          },
+        ]
+
+  for (const sec of sections) {
+    const badge = sec.next
+      ? ` [${routeDisplayName(systemId, sec.next.route)}]`
+      : ''
+    lines.push(`${sec.arrow} ${sec.label}${badge}`)
+    const minsText = sec.next
+      ? String(Math.min(99, minutesUntil(sec.next.arrivalTime, now)))
+      : '--'
+    const rows = bigNumberRows(minsText)
+    lines.push(`  ${rows[0]}`)
+    lines.push(`  ${rows[1]}  min`)
+    lines.push(`  ${rows[2]}`)
+  }
+
+  lines.push('tap:detail  dbl:exit')
+  return lines.join('\n')
+}
+
 /**
  * Render the alert summary view.
  * Shown when user taps while alerts are active.

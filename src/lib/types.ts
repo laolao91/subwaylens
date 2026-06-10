@@ -42,6 +42,8 @@ export interface AppSettings {
   nearbyRadius: number     // miles (0.1, 0.25, 0.5, 1.0)
   hiddenRoutes: Record<string, string[]>  // stationId → route IDs to hide on glasses
   regionId: string         // active transit region ('nyc', 'sf', 'boston', ...), default 'nyc'
+  /** High-readability glance mode: one giant countdown per direction. Default off. */
+  glanceMode: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -50,4 +52,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   nearbyRadius: 0.25,
   hiddenRoutes: {},
   regionId: 'nyc',
+  glanceMode: false,
 }
