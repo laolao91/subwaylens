@@ -28,8 +28,10 @@ import {
   prevStation,
   refreshCurrentArrivals,
   refreshAlerts,
+  refreshOutages,
   getCachedAlerts,
   getCachedArrivals,
+  getOutagesForCurrentStation,
   prefetchAllStations,
   applyRouteFilter,
   isFavorite,
@@ -197,7 +199,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     return
   }
 
-  const headerText = renderHeader(station, isFavorite(station.id))
+  const headerText = renderHeader(station, isFavorite(station.id), getOutagesForCurrentStation().length > 0)
   const cached = getCachedArrivals(station.id)
   const alerts = getCachedAlerts()
 
@@ -205,7 +207,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   // then refresh in the background and update once fresh data arrives.
   if (cached) {
     const filtered = applyRouteFilter(cached, station.id)
-    const initialBody = renderBody(station, filtered, currentIndex, stations.length, alerts)
+    const initialBody = renderBody(station, filtered, currentIndex, stations.length, alerts, getOutagesForCurrentStation().length)
     lastBodyText = initialBody
     if (useRebuild) {
       await rebuildPage(headerText, initialBody)
@@ -226,6 +228,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   const [arrivals] = await Promise.all([
     refreshCurrentArrivals(),
     refreshAlerts(),
+    refreshOutages(),
   ])
 
   if (displaySeq !== seq) return
@@ -235,7 +238,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
     station.id
   )
-  const bodyText = renderBody(station, filtered, currentIndex, stations.length, freshAlerts)
+  const bodyText = renderBody(station, filtered, currentIndex, stations.length, freshAlerts, getOutagesForCurrentStation().length)
   lastBodyText = bodyText
   await updateBody(bodyText)
 }
@@ -256,6 +259,7 @@ async function refreshInPlace(): Promise<void> {
     const [arrivals] = await Promise.all([
       refreshCurrentArrivals(),
       refreshAlerts(),
+      refreshOutages(),
     ])
 
     // Navigation occurred mid-refresh — discard stale result.
@@ -267,12 +271,12 @@ async function refreshInPlace(): Promise<void> {
       arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
       station.id
     )
-    const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts)
-    await updateHeader(renderHeader(station, isFavorite(station.id)))
+    const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts, getOutagesForCurrentStation().length)
+    await updateHeader(renderHeader(station, isFavorite(station.id), getOutagesForCurrentStation().length > 0))
     lastBodyText = bodyText
 
     if (isAlertView && arrivals) {
-      await updateBody(renderAlertSummary(arrivals, alerts))
+      await updateBody(renderAlertSummary(arrivals, alerts, getOutagesForCurrentStation()))
     } else {
       await updateBody(bodyText)
     }
@@ -293,7 +297,7 @@ async function renderCurrentFromCache(): Promise<boolean> {
   if (!cached) return false
   const { stations, currentIndex } = getState()
   const filtered = applyRouteFilter(cached, station.id)
-  const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
+  const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts(), getOutagesForCurrentStation().length)
   lastBodyText = bodyText
   await updateBody(bodyText)
   return true
@@ -342,7 +346,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   const station = currentStation()
   if (station) {
     await createInitialPage(
-      renderHeader(station, isFavorite(station.id)),
+      renderHeader(station, isFavorite(station.id), getOutagesForCurrentStation().length > 0),
       renderLoading()
     )
   } else {
@@ -352,14 +356,14 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   if (station) {
     // Warm the cache for all favorites in parallel, then paint from cache.
     const seq = ++displaySeq
-    await Promise.all([prefetchAllStations(), refreshAlerts()])
+    await Promise.all([prefetchAllStations(), refreshAlerts(), refreshOutages()])
     if (displaySeq === seq) {
       const { stations, currentIndex } = getState()
       const alerts = getCachedAlerts()
       const cached = getCachedArrivals(station.id)
       if (cached) {
         const filtered = applyRouteFilter(cached, station.id)
-        const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts)
+        const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts, getOutagesForCurrentStation().length)
         lastBodyText = bodyText
         await updateBody(bodyText)
       }
@@ -394,12 +398,15 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
             ...cachedArrivals.south.map(t => t.route),
           ]
         : []
-      const hasAlerts = routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0)
+      const outages = getOutagesForCurrentStation()
+      const hasAlerts =
+        routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0) ||
+        outages.length > 0
 
       if (hasAlerts && cachedArrivals) {
         isAlertView = !isAlertView
         if (isAlertView) {
-          await updateBody(renderAlertSummary(cachedArrivals, alerts))
+          await updateBody(renderAlertSummary(cachedArrivals, alerts, outages))
         } else {
           // Re-render from cache so the footer timestamp is current
           // (replaying lastBodyText verbatim showed a stale clock — bug #5).
@@ -421,7 +428,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       isAlertView = false
       loadStations().then(() => {
         // Warm cache for all stations before displaying, then display current.
-        Promise.all([prefetchAllStations(), refreshAlerts()]).then(() =>
+        Promise.all([prefetchAllStations(), refreshAlerts(), refreshOutages()]).then(() =>
           displayCurrentStation(true)
         )
       })

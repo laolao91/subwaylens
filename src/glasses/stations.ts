@@ -7,6 +7,7 @@
 import { allStations, stationById, loadRegionStations } from '../data/stations'
 import { getStationArrivals } from '../data/arrivals'
 import { fetchAlerts } from '../data/alerts'
+import { fetchOutages, outagesForStation, type EquipmentOutage } from '../data/outages'
 import { getFavorites, getSettings } from '../lib/storage'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
 import type { Station, StationArrivals, AppSettings } from '../lib/types'
@@ -23,6 +24,8 @@ export interface StationManagerState {
   arrivals: Map<string, StationArrivals>
   /** Cached service alerts per route ID */
   alerts: Map<string, RouteAlert[]>
+  /** Cached equipment outages (NYC subway, system-wide list) */
+  outages: EquipmentOutage[]
 }
 
 let state: StationManagerState = {
@@ -31,6 +34,7 @@ let state: StationManagerState = {
   currentIndex: 0,
   arrivals: new Map(),
   alerts: new Map(),
+  outages: [],
 }
 
 // Cached settings so route-filter lookups don't require async reads on every display call.
@@ -121,6 +125,28 @@ export async function refreshAlerts(): Promise<Map<string, RouteAlert[]>> {
  */
 export function getCachedAlerts(): Map<string, RouteAlert[]> {
   return state.alerts
+}
+
+/**
+ * Refresh equipment outages (5-min cache inside fetchOutages). Skipped
+ * when the active list has no NYC subway stations — the feed only
+ * covers the subway.
+ */
+export async function refreshOutages(): Promise<EquipmentOutage[]> {
+  const hasSubway = state.stations.some((s) => !s.system || s.system === 'nyc-subway')
+  if (!hasSubway) {
+    state.outages = []
+    return state.outages
+  }
+  state.outages = await fetchOutages()
+  return state.outages
+}
+
+/** Outages affecting the current station (empty when none / non-subway). */
+export function getOutagesForCurrentStation(): EquipmentOutage[] {
+  const station = currentStation()
+  if (!station) return []
+  return outagesForStation(station, state.outages)
 }
 
 /**

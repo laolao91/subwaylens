@@ -21,6 +21,7 @@ import { TERMINAL_ABBREVS } from '../data/terminal-abbrevs'
 import { getBoroughCode } from '../data/boroughs'
 import type { RouteAlert } from '../data/alerts'
 import { alertsForRoutes, routeHasAlert } from '../data/alerts'
+import type { EquipmentOutage } from '../data/outages'
 import { getSystem } from '../data/systems'
 import { routeDisplayName } from '../data/pack-registry'
 
@@ -64,8 +65,14 @@ function getCurrentTimeStr(): string {
  * Render the header text container content.
  * Shows station name + favorite star + live clock on the right.
  */
-export function renderHeader(station: Station, isFavorite: boolean): string {
-  const star = isFavorite ? ' ★' : ''
+export function renderHeader(
+  station: Station,
+  isFavorite: boolean,
+  hasOutage = false
+): string {
+  // Equipment outage marker: one char, zero rows (design decision —
+  // outage details live in the tap-to-view alert summary).
+  const star = (isFavorite ? ' ★' : '') + (hasOutage ? '!' : '')
   const timeStr = getCurrentTimeStr()
   // Commuter-rail stations get a system tag so "Penn Station" is
   // unambiguously the LIRR vs MNR board.
@@ -164,7 +171,8 @@ export function renderBody(
   arrivals: StationArrivals,
   stationIndex: number,
   totalStations: number,
-  alerts: Map<string, RouteAlert[]>
+  alerts: Map<string, RouteAlert[]>,
+  outageCount = 0
 ): string {
   const system = getSystem(station.system)
   if (system.layout === 'departure-board') {
@@ -231,9 +239,10 @@ export function renderBody(
   }
 
   // Footer: stale warning when data is > 2 min old; otherwise normal control hint.
+  // Equipment outages count as notices — they flip the hint to tap:alerts.
   const routeIds = routeIdsFromArrivals(arrivals)
-  const hasAlerts = routeIds.some(id => routeHasAlert(alerts, id))
-  const ageSecs = Math.floor(Date.now() / 1000) - arrivals.fetchedAt
+  const hasAlerts = routeIds.some(id => routeHasAlert(alerts, id)) || outageCount > 0
+  const ageSecs = now - arrivals.fetchedAt
   if (ageSecs > 120) {
     const ageMin = Math.floor(ageSecs / 60)
     lines.push(hasAlerts
@@ -345,16 +354,34 @@ function renderDepartureBoard(
  */
 export function renderAlertSummary(
   arrivals: StationArrivals,
-  alerts: Map<string, RouteAlert[]>
+  alerts: Map<string, RouteAlert[]>,
+  outages: EquipmentOutage[] = []
 ): string {
   const lines: string[] = []
   lines.push('! SERVICE ALERTS')
   lines.push('━'.repeat(DIVIDER_WIDTH))
 
-  const routeIds = routeIdsFromArrivals(arrivals)
-  const activeAlerts = alertsForRoutes(alerts, routeIds).slice(0, 4)
+  // Equipment outages render first — they're station-specific while
+  // route alerts may apply system-wide. Cap entries so the combined
+  // view stays within the display budget.
+  const outageEntries = outages.slice(0, 2)
+  for (const o of outageEntries) {
+    const badge = o.equipmentType === 'EL' ? '[ELEV]' : '[ESC]'
+    const desc = o.serving || 'out of service'
+    const maxFirst = CHARS_PER_LINE - badge.length - 1
+    if (desc.length <= maxFirst) {
+      lines.push(`${badge} ${desc}`)
+    } else {
+      lines.push(`${badge} ${desc.slice(0, maxFirst)}`)
+      const rest = desc.slice(maxFirst)
+      lines.push(`    ${rest.length > CHARS_PER_LINE - 5 ? rest.slice(0, CHARS_PER_LINE - 6) + '.' : rest}`)
+    }
+  }
 
-  if (activeAlerts.length === 0) {
+  const routeIds = routeIdsFromArrivals(arrivals)
+  const activeAlerts = alertsForRoutes(alerts, routeIds).slice(0, 4 - outageEntries.length)
+
+  if (activeAlerts.length === 0 && outageEntries.length === 0) {
     lines.push('  No active alerts.')
   } else {
     for (const alert of activeAlerts) {
