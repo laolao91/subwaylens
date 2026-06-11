@@ -40,12 +40,13 @@ import {
 } from './glasses/stations'
 import {
   renderHeader,
-  renderBody,
+  renderBodyColumns,
   renderGlanceBody,
   renderAlertSummary,
   renderLoading,
   renderNoStations,
 } from './glasses/display'
+import type { BodyColumns } from './glasses/display'
 import { setupInput } from './glasses/input'
 import { getSettings } from './lib/storage'
 import { getSystem } from './data/systems'
@@ -57,6 +58,14 @@ const HEADER_ID = 1
 const HEADER_NAME = 'hdr'
 const BODY_ID = 2
 const BODY_NAME = 'body'
+// Column overlay containers (Option B, 2026-06-11): borough + time
+// columns for the directional view. They overlay the right side of the
+// full-width body container — body text on train rows stays short
+// (≤ ~21 chars) so the overlaid region is blank text-space underneath.
+const BOROUGH_ID = 3
+const BOROUGH_NAME = 'bor'
+const TIME_ID = 4
+const TIME_NAME = 'tim'
 
 let bridge: EvenAppBridge | null = null
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -93,8 +102,10 @@ let isRefreshing = false
  */
 function buildContainers(
   headerText: string,
-  bodyText: string
-): [TextContainerProperty, TextContainerProperty] {
+  bodyText: string,
+  boroughText: string,
+  timeText: string
+): [TextContainerProperty, TextContainerProperty, TextContainerProperty, TextContainerProperty] {
   const header = new TextContainerProperty({
     xPosition: 0,
     yPosition: 0,
@@ -125,19 +136,53 @@ function buildContainers(
     isEventCapture: 1,
   })
 
-  return [header, body]
+  const borough = new TextContainerProperty({
+    xPosition: 352,
+    yPosition: 28,
+    width: 58,
+    height: 260,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRadius: 0,
+    paddingLength: 4,
+    containerID: BOROUGH_ID,
+    containerName: BOROUGH_NAME,
+    content: boroughText,
+    isEventCapture: 0,
+  })
+
+  const time = new TextContainerProperty({
+    xPosition: 412,
+    yPosition: 28,
+    width: 164,
+    height: 260,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRadius: 0,
+    paddingLength: 4,
+    containerID: TIME_ID,
+    containerName: TIME_NAME,
+    content: timeText,
+    isEventCapture: 0,
+  })
+
+  return [header, body, borough, time]
 }
 
 async function createInitialPage(
   headerText: string,
-  bodyText: string
+  bodyText: string,
+  boroughText = '',
+  timeText = ''
 ): Promise<void> {
   if (!bridge) return
-  const [header, body] = buildContainers(headerText, bodyText)
+  const containers = buildContainers(headerText, bodyText, boroughText, timeText)
+  lastBorough = boroughText
+  lastTime = timeText
   const result = await bridge.createStartUpPageContainer(
     new CreateStartUpPageContainer({
-      containerTotalNum: 2,
-      textObject: [header, body],
+      containerTotalNum: 4,
+      textObject: containers,
     })
   )
   if (result !== 0) {
@@ -147,14 +192,18 @@ async function createInitialPage(
 
 async function rebuildPage(
   headerText: string,
-  bodyText: string
+  bodyText: string,
+  boroughText = '',
+  timeText = ''
 ): Promise<void> {
   if (!bridge) return
-  const [header, body] = buildContainers(headerText, bodyText)
+  const containers = buildContainers(headerText, bodyText, boroughText, timeText)
+  lastBorough = boroughText
+  lastTime = timeText
   await bridge.rebuildPageContainer(
     new RebuildPageContainer({
-      containerTotalNum: 2,
-      textObject: [header, body],
+      containerTotalNum: 4,
+      textObject: containers,
     })
   )
 }
@@ -185,6 +234,39 @@ async function updateHeader(text: string): Promise<void> {
   )
 }
 
+// Last-written column contents — skip redundant BLE writes (non-columnar
+// views clear the columns once, then stop touching them).
+let lastBorough = ''
+let lastTime = ''
+
+async function updateColumns(boroughText: string, timeText: string): Promise<void> {
+  if (!bridge) return
+  if (boroughText !== lastBorough) {
+    lastBorough = boroughText
+    await bridge.textContainerUpgrade(
+      new TextContainerUpgrade({
+        containerID: BOROUGH_ID,
+        containerName: BOROUGH_NAME,
+        contentOffset: 0,
+        contentLength: 500,
+        content: boroughText,
+      })
+    )
+  }
+  if (timeText !== lastTime) {
+    lastTime = timeText
+    await bridge.textContainerUpgrade(
+      new TextContainerUpgrade({
+        containerID: TIME_ID,
+        containerName: TIME_NAME,
+        contentOffset: 0,
+        contentLength: 800,
+        content: timeText,
+      })
+    )
+  }
+}
+
 // ── Display update logic ──
 
 async function displayCurrentStation(useRebuild: boolean): Promise<void> {
@@ -203,6 +285,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     } else {
       await updateHeader('SubwayLens')
       await updateBody(renderNoStations())
+      await updateColumns('', '')
     }
     return
   }
@@ -215,13 +298,13 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   // then refresh in the background and update once fresh data arrives.
   if (cached) {
     const filtered = applyRouteFilter(cached, station.id)
-    const initialBody = composeBody(station, filtered, currentIndex, stations.length, alerts)
-    lastBodyText = initialBody
+    const cols = composeColumns(station, filtered, currentIndex, stations.length, alerts)
+    lastBodyText = cols.body
     if (useRebuild) {
-      await rebuildPage(headerText, initialBody)
+      await rebuildPage(headerText, cols.body, cols.borough, cols.time)
     } else {
       await updateHeader(headerText)
-      await updateBody(initialBody)
+      await showColumns(cols)
     }
   } else {
     if (useRebuild) {
@@ -229,6 +312,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     } else {
       await updateHeader(headerText)
       await updateBody(renderLoading())
+      await updateColumns('', '')
     }
   }
 
@@ -246,9 +330,7 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
     station.id
   )
-  const bodyText = composeBody(station, filtered, currentIndex, stations.length, freshAlerts)
-  lastBodyText = bodyText
-  await updateBody(bodyText)
+  await showColumns(composeColumns(station, filtered, currentIndex, stations.length, freshAlerts))
 }
 
 async function refreshInPlace(): Promise<void> {
@@ -279,14 +361,15 @@ async function refreshInPlace(): Promise<void> {
       arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
       station.id
     )
-    const bodyText = composeBody(station, filtered, currentIndex, stations.length, alerts)
+    const cols = composeColumns(station, filtered, currentIndex, stations.length, alerts)
     await updateHeader(renderHeader(station, isFavorite(station.id), getOutagesForCurrentStation().length > 0))
-    lastBodyText = bodyText
+    lastBodyText = cols.body
 
     if (isAlertView && arrivals) {
       await updateBody(renderAlertSummary(arrivals, alerts, getOutagesForCurrentStation()))
+      await updateColumns('', '')
     } else {
-      await updateBody(bodyText)
+      await showColumns(cols)
     }
   } finally {
     isRefreshing = false
@@ -298,16 +381,25 @@ function inGlanceView(): boolean {
   return (getCachedSettings()?.glanceMode ?? false) && !isDetailView && !isAlertView
 }
 
-/** Body for the current view: glance or full detail. */
-function composeBody(
+/** Body + columns for the current view: glance (no columns) or detail. */
+function composeColumns(
   station: NonNullable<ReturnType<typeof currentStation>>,
   filtered: ReturnType<typeof applyRouteFilter>,
   currentIndex: number,
   total: number,
   alerts: ReturnType<typeof getCachedAlerts>
-): string {
-  if (inGlanceView()) return renderGlanceBody(station, filtered)
-  return renderBody(station, filtered, currentIndex, total, alerts, getOutagesForCurrentStation().length)
+): BodyColumns {
+  if (inGlanceView()) {
+    return { body: renderGlanceBody(station, filtered), borough: '', time: '' }
+  }
+  return renderBodyColumns(station, filtered, currentIndex, total, alerts, getOutagesForCurrentStation().length)
+}
+
+/** Write a composed view to the glasses: body container + column overlays. */
+async function showColumns(cols: BodyColumns): Promise<void> {
+  lastBodyText = cols.body
+  await updateBody(cols.body)
+  await updateColumns(cols.borough, cols.time)
 }
 
 /**
@@ -322,9 +414,7 @@ async function renderCurrentFromCache(): Promise<boolean> {
   if (!cached) return false
   const { stations, currentIndex } = getState()
   const filtered = applyRouteFilter(cached, station.id)
-  const bodyText = composeBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
-  lastBodyText = bodyText
-  await updateBody(bodyText)
+  await showColumns(composeColumns(station, filtered, currentIndex, stations.length, getCachedAlerts()))
   return true
 }
 
@@ -391,9 +481,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       const cached = getCachedArrivals(station.id)
       if (cached) {
         const filtered = applyRouteFilter(cached, station.id)
-        const bodyText = composeBody(station, filtered, currentIndex, stations.length, alerts)
-        lastBodyText = bodyText
-        await updateBody(bodyText)
+        await showColumns(composeColumns(station, filtered, currentIndex, stations.length, alerts))
       }
     }
   }
@@ -445,6 +533,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
         } else if (hasAlerts && cachedArrivals) {
           isAlertView = true
           await updateBody(renderAlertSummary(cachedArrivals, alerts, outages))
+          await updateColumns('', '')
         } else {
           isDetailView = false
           refreshInPlace()
@@ -456,6 +545,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
         isAlertView = !isAlertView
         if (isAlertView) {
           await updateBody(renderAlertSummary(cachedArrivals, alerts, outages))
+          await updateColumns('', '')
         } else {
           // Re-render from cache so the footer timestamp is current
           // (replaying lastBodyText verbatim showed a stale clock — bug #5).
@@ -527,7 +617,7 @@ async function applyDevSeed(): Promise<void> {
     hiddenRoutes: {}, regionId: 'nyc', glanceMode: false,
   }
   if (seed === 'nyc') {
-    await saveFavorites(['127', 'lirr:237'])
+    await saveFavorites(['616', 'lirr:237'])
     await saveSettings(base)
   } else if (seed === 'nyc-glance') {
     await saveFavorites(['127'])

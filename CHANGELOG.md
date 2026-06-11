@@ -2,6 +2,10 @@
 
 Feature release: LIRR + Metro-North departure boards, multi-city support, equipment outage alerts, glance mode, and a performance overhaul of feed fetching.
 
+### New: Column Layout with Per-Train Borough Tags (NYC subway)
+
+- The directional view now renders as three pixel-aligned column containers: trains, borough, and arrival times. Every train line carries its own borough tag (MAN/QNS/BK/BX) — essential at stations like Jackson Hts-Roosevelt Av where one platform serves E→Chambers St (MAN) next to F→Coney Island (BK). The layout was tightened to 9 rows so the footer and station position always fit on screen, and station scrolling responds on the first gesture.
+
 ### New: Equipment Outage Alerts (NYC subway)
 
 - A `!` marker appears in the header when the current station has an elevator or escalator out of service (keyless MTA outage feed, 5-min cache). Details appear as [ELEV]/[ESC] entries in the existing tap-to-view alert summary — zero arrival rows consumed.

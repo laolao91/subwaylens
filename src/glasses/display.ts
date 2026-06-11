@@ -87,45 +87,56 @@ export function renderHeader(
 }
 
 /**
- * Format a single train line with fixed-width terminal column.
- * Terminal name always padded/truncated to TERMINAL_WIDTH chars so the
- * time column starts at a consistent horizontal position.
- * Appends '!' to route badge if the route has an active alert.
- * Shows "+Xm late" instead of terminal name when GTFS-RT reports a delay > 60s.
- *
- * Format: "▶[R!] Terminal_name__  Nm - H:MM"
- *    or:  " [R!] +3m late______   Nm - H:MM"
+ * Columnar row model for the directional view (Option B hardware
+ * experiment, 2026-06-11). Train rows split into three aligned columns
+ * rendered by separate text containers:
+ *   left    — marker + route badge + terminal (body container)
+ *   borough — MAN/QNS/BK/BX per train (overlay container)
+ *   time    — arrival countdown (overlay container)
+ * Full-width rows (labels, dividers, footer) live in the body container
+ * with blank lines in the column containers so row indices stay aligned.
+ * Alignment depends on every line staying within its container width —
+ * no wrapping anywhere.
  */
-function formatTrainLine(
+export interface BodyColumns {
+  body: string
+  borough: string
+  time: string
+}
+
+type DirRow =
+  | { full: string }
+  | { left: string; borough: string; time: string }
+
+/** Terminal width in the columnar layout — truncate only, no padding. */
+const COL_TERMINAL_WIDTH = 12
+
+function trainRow(
   arrival: TrainArrival,
   now: number,
   alerts: Map<string, RouteAlert[]>
-): string {
+): DirRow {
   const hasAlert = routeHasAlert(alerts, arrival.route)
   const badge = hasAlert ? `[${arrival.route}!]` : `[${arrival.route}]`
-  const time = formatArrival(arrival.arrivalTime, now)
 
-  let terminalDisplay: string
+  let terminal: string
+  let borough = ''
   if (arrival.delay && arrival.delay > 60) {
-    const delayMins = Math.round(arrival.delay / 60)
-    const raw = `+${delayMins}m late`
-    terminalDisplay = raw.length > TERMINAL_WIDTH
-      ? raw.slice(0, TERMINAL_WIDTH - 1) + '.'
-      : raw.padEnd(TERMINAL_WIDTH, ' ')
+    terminal = `+${Math.round(arrival.delay / 60)}m late`
   } else {
-    // Abbreviation lookup first, then fixed-width pad/truncate
     const raw = TERMINAL_ABBREVS[arrival.terminal] ?? arrival.terminal
-    terminalDisplay = raw.length > TERMINAL_WIDTH
-      ? raw.slice(0, TERMINAL_WIDTH - 1) + '.'
-      : raw.padEnd(TERMINAL_WIDTH, ' ')
+    terminal = raw.length > COL_TERMINAL_WIDTH
+      ? raw.slice(0, COL_TERMINAL_WIDTH - 1) + '.'
+      : raw
+    borough = getBoroughCode(arrival.terminal)
   }
 
-  const soon = isArrivingSoon(arrival.arrivalTime, now)
-  const marker = soon ? '▶' : ' '
-
-  const left = `${marker}${badge} ${terminalDisplay}`
-  const gap = Math.max(1, CHARS_PER_LINE - left.length - time.length)
-  return left + ' '.repeat(gap) + time
+  const marker = isArrivingSoon(arrival.arrivalTime, now) ? '▶' : ' '
+  return {
+    left: `${marker}${badge} ${terminal}`,
+    borough,
+    time: formatArrival(arrival.arrivalTime, now),
+  }
 }
 
 /**
@@ -161,6 +172,101 @@ function routeIdsFromArrivals(arrivals: StationArrivals): string[] {
 }
 
 /**
+ * Build the directional view as a row model. Used by both
+ * renderBodyColumns (glasses column containers) and renderBody (legacy
+ * merged string for the phone preview).
+ *
+ * Per-line borough tags replaced the old per-section borough row
+ * (2026-06-11): a single direction can serve terminals in different
+ * boroughs (Jackson Hts: E→World Trade Center·MAN next to F→Coney
+ * Island·BK), so one section-level tag was wrong for somebody.
+ */
+function buildDirectionalRows(
+  station: Station,
+  arrivals: StationArrivals,
+  stationIndex: number,
+  totalStations: number,
+  alerts: Map<string, RouteAlert[]>,
+  outageCount: number
+): DirRow[] {
+  const now = Math.floor(Date.now() / 1000)
+  const rows: DirRow[] = []
+
+  // Non-subway directional systems carry route IDs that need display
+  // mapping (e.g. MSP "901" → "Blue").
+  const mapRoute = (t: TrainArrival): TrainArrival =>
+    station.system && station.system !== 'nyc-subway'
+      ? { ...t, route: routeDisplayName(station.system, t.route) }
+      : t
+
+  const northTrains = arrivals.north.slice(0, MAX_TRAINS).map(mapRoute)
+  rows.push({ full: `▲ ${directionLabel(northTrains, station.north)}` })
+  if (northTrains.length === 0) {
+    rows.push({ full: '  No live data' })
+  } else {
+    for (const t of northTrains) rows.push(trainRow(t, now, alerts))
+  }
+
+  // No divider row between sections: the columnar view runs 11 rows with
+  // it, overflowing the 260px container and summoning per-container
+  // scrollbars (= column desync risk). The ▼ label separates plenty.
+  const southTrains = arrivals.south.slice(0, MAX_TRAINS).map(mapRoute)
+  rows.push({ full: `▼ ${directionLabel(southTrains, station.south)}` })
+  if (southTrains.length === 0) {
+    rows.push({ full: '  No live data' })
+  } else {
+    for (const t of southTrains) rows.push(trainRow(t, now, alerts))
+  }
+
+  // Station position folds into the footer (no separate progress-bar row):
+  // 10+ rows overflow the 260px container and summon per-container
+  // scrollbars, desyncing the column overlays. 9 rows fit with margin.
+  const pos = totalStations > 1 ? `${stationIndex + 1}/${totalStations}  ` : ''
+  const routeIds = routeIdsFromArrivals(arrivals)
+  const hasAlerts = routeIds.some((id) => routeHasAlert(alerts, id)) || outageCount > 0
+  const hint = hasAlerts ? 'tap:alerts  dbl:exit' : 'tap:refresh  dbl:exit'
+  const ageSecs = now - arrivals.fetchedAt
+  if (ageSecs > 120) {
+    rows.push({ full: `${pos}! ${Math.floor(ageSecs / 60)}m old  ${hint}` })
+  } else {
+    const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
+    rows.push({ full: `${pos}${fetchStr}  ${hint}` })
+  }
+
+  return rows
+}
+
+/**
+ * Columnar body for the glasses (Option B): body/borough/time strings,
+ * one per container, row-aligned by line index. Non-columnar layouts
+ * (departure boards) return empty columns — the caller clears those
+ * containers.
+ */
+export function renderBodyColumns(
+  station: Station,
+  arrivals: StationArrivals,
+  stationIndex: number,
+  totalStations: number,
+  alerts: Map<string, RouteAlert[]>,
+  outageCount = 0
+): BodyColumns {
+  const system = getSystem(station.system)
+  if (system.layout === 'departure-board') {
+    return {
+      body: renderDepartureBoard(station, arrivals, stationIndex, totalStations),
+      borough: '',
+      time: '',
+    }
+  }
+  const rows = buildDirectionalRows(station, arrivals, stationIndex, totalStations, alerts, outageCount)
+  return {
+    body: rows.map((r) => ('full' in r ? r.full : r.left)).join('\n'),
+    borough: rows.map((r) => ('full' in r ? '' : r.borough)).join('\n'),
+    time: rows.map((r) => ('full' in r ? '' : r.time)).join('\n'),
+  }
+}
+
+/**
  * Render the body text container content.
  * Shows both directions with train arrivals, progress bar, and control hint.
  * When alerts exist for routes at this station, footer hint changes to
@@ -179,79 +285,17 @@ export function renderBody(
     return renderDepartureBoard(station, arrivals, stationIndex, totalStations)
   }
 
-  const now = Math.floor(Date.now() / 1000)
-  const lines: string[] = []
+  const rows = buildDirectionalRows(station, arrivals, stationIndex, totalStations, alerts, outageCount)
 
-  // Non-subway directional systems carry route IDs that need display
-  // mapping (e.g. MBTA "Green-B" stays, but MSP "901" → "Blue").
-  const mapRoute = (t: TrainArrival): TrainArrival =>
-    station.system && station.system !== 'nyc-subway'
-      ? { ...t, route: routeDisplayName(station.system, t.route) }
-      : t
-
-  // North direction
-  const northTrains = arrivals.north.slice(0, MAX_TRAINS).map(mapRoute)
-  const northLabel = directionLabel(northTrains, station.north)
-  lines.push(`▲ ${northLabel}`)
-
-  const northBorough = getBoroughCode(northLabel)
-  if (northBorough) lines.push(northBorough)
-
-  if (northTrains.length === 0) {
-    lines.push('  No live data')
-  } else {
-    for (const t of northTrains) {
-      lines.push(formatTrainLine(t, now, alerts))
-    }
-  }
-
-  // Solid heavy divider between directions
-  lines.push('━'.repeat(DIVIDER_WIDTH))
-
-  // South direction
-  const southTrains = arrivals.south.slice(0, MAX_TRAINS).map(mapRoute)
-  const southLabel = directionLabel(southTrains, station.south)
-  lines.push(`▼ ${southLabel}`)
-
-  const southBorough = getBoroughCode(southLabel)
-  if (southBorough) lines.push(southBorough)
-
-  if (southTrains.length === 0) {
-    lines.push('  No live data')
-  } else {
-    for (const t of southTrains) {
-      lines.push(formatTrainLine(t, now, alerts))
-    }
-  }
-
-  // Progress bar
-  if (totalStations > 1) {
-    const pos = `${stationIndex + 1}/${totalStations}`
-    const barTotal = DIVIDER_WIDTH - pos.length - 1
-    const filled = Math.max(
-      1,
-      Math.round((barTotal * (stationIndex + 1)) / totalStations)
-    )
-    const empty = barTotal - filled
-    const bar = '━'.repeat(filled) + '─'.repeat(empty)
-    lines.push(bar + ' ' + pos)
-
-  }
-
-  // Footer: stale warning when data is > 2 min old; otherwise normal control hint.
-  // Equipment outages count as notices — they flip the hint to tap:alerts.
-  const routeIds = routeIdsFromArrivals(arrivals)
-  const hasAlerts = routeIds.some(id => routeHasAlert(alerts, id)) || outageCount > 0
-  const ageSecs = now - arrivals.fetchedAt
-  if (ageSecs > 120) {
-    const ageMin = Math.floor(ageSecs / 60)
-    lines.push(hasAlerts
-      ? `! ${ageMin}m old  tap:alerts  dbl:exit`
-      : `! ${ageMin}m old  tap:refresh  dbl:exit`)
-  } else {
-    const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
-    lines.push(hasAlerts ? `${fetchStr}  tap:alerts  dbl:exit` : `${fetchStr}  tap:refresh  dbl:exit`)
-  }
+  // Legacy merged string (phone GlassesPreview + tests): pad columns back
+  // into a single 38-char line per row.
+  const lines = rows.map((r) => {
+    if ('full' in r) return r.full
+    const left = r.left.length > 21 ? r.left.slice(0, 20) + '.' : r.left.padEnd(21, ' ')
+    const borough = r.borough.padEnd(4, ' ')
+    const gap = Math.max(1, CHARS_PER_LINE - left.length - borough.length - r.time.length)
+    return left + borough + ' '.repeat(gap - 1) + r.time
+  })
 
   return lines.join('\n')
 }

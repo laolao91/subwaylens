@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { renderLoading, renderNoStations, renderBody, branchAbbrev, renderGlanceBody } from './display'
+import { renderLoading, renderNoStations, renderBody, renderBodyColumns, branchAbbrev, renderGlanceBody } from './display'
 import { registerSystemPack } from '../data/arrivals'
 import type { Station, StationArrivals } from '../lib/types'
 
@@ -168,5 +168,83 @@ describe('renderGlanceBody', () => {
     const arrivals: StationArrivals = { stationId: '127', north: [], south: [], fetchedAt: now }
     const text = renderGlanceBody(SUBWAY_STATION, arrivals)
     expect(text).toContain('-- min')
+  })
+})
+
+// ── Columnar body (Option B) ──
+
+describe('renderBodyColumns', () => {
+  const JACKSON_HTS: Station = {
+    id: '616', name: 'Jackson Hts-Roosevelt Av', stops: ['G14', '710', 'R09'],
+    routes: ['E', 'F', 'M', 'R', '7'], lat: 40.74, lng: -73.89,
+    north: 'Queens', south: 'Manhattan',
+  }
+
+  function mixedArrivals(now: number): StationArrivals {
+    return {
+      stationId: '616',
+      north: [
+        { route: 'F', direction: 'N', stopId: 'G14N', arrivalTime: now + 180, terminal: 'Jamaica-179 St' },
+        { route: 'E', direction: 'N', stopId: 'G14N', arrivalTime: now + 360, terminal: 'Jamaica Center-Parsons/Archer' },
+      ],
+      south: [
+        { route: 'E', direction: 'S', stopId: 'G14S', arrivalTime: now + 120, terminal: 'World Trade Center' },
+        { route: 'F', direction: 'S', stopId: 'G14S', arrivalTime: now + 300, terminal: 'Coney Island-Stillwell Av' },
+      ],
+      fetchedAt: now,
+    }
+  }
+
+  it('keeps all three columns line-aligned (same line count)', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const cols = renderBodyColumns(JACKSON_HTS, mixedArrivals(now), 0, 2, new Map())
+    const bodyLines = cols.body.split('\n')
+    expect(cols.borough.split('\n')).toHaveLength(bodyLines.length)
+    expect(cols.time.split('\n')).toHaveLength(bodyLines.length)
+  })
+
+  it('tags each train with its own borough — mixed directions stay accurate', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const cols = renderBodyColumns(JACKSON_HTS, mixedArrivals(now), 0, 2, new Map())
+    const body = cols.body.split('\n')
+    const borough = cols.borough.split('\n')
+    // Southbound: E→World Trade Center is MAN, F→Coney Island is BK
+    const eIdx = body.findIndex((l) => l.includes('[E]') && l.includes('WTC'))
+    const fIdx = body.findIndex((l) => l.includes('[F]') && l.includes('Coney'))
+    expect(eIdx).toBeGreaterThan(-1)
+    expect(fIdx).toBeGreaterThan(-1)
+    expect(borough[eIdx]).toBe('MAN')
+    expect(borough[fIdx]).toBe('BK')
+  })
+
+  it('full-width rows (labels, dividers, footer) have blank column lines', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const cols = renderBodyColumns(JACKSON_HTS, mixedArrivals(now), 0, 2, new Map())
+    const body = cols.body.split('\n')
+    const borough = cols.borough.split('\n')
+    const time = cols.time.split('\n')
+    const labelIdx = body.findIndex((l) => l.startsWith('▲'))
+    expect(borough[labelIdx]).toBe('')
+    expect(time[labelIdx]).toBe('')
+  })
+
+  it('departure-board systems return empty columns', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const empty: StationArrivals = { stationId: 'lirr:237', north: [], south: [], fetchedAt: now }
+    const cols = renderBodyColumns(LIRR_STATION, empty, 0, 1, new Map())
+    expect(cols.borough).toBe('')
+    expect(cols.time).toBe('')
+    expect(cols.body).toContain('DEPARTURES')
+  })
+
+  it('body train lines stay clear of the column overlay region (≤21 chars)', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const cols = renderBodyColumns(JACKSON_HTS, mixedArrivals(now), 0, 2, new Map())
+    const borough = cols.borough.split('\n')
+    cols.body.split('\n').forEach((line, i) => {
+      if (borough[i] !== '' || cols.time.split('\n')[i] !== '') {
+        expect(line.length).toBeLessThanOrEqual(21)
+      }
+    })
   })
 })
