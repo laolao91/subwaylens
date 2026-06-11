@@ -526,7 +526,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
         if (isAlertView) {
           isAlertView = false
           isDetailView = false
-          await renderCurrentFromCache()
+          refreshInPlace()
         } else if (!isDetailView) {
           isDetailView = true
           await renderCurrentFromCache()
@@ -542,15 +542,15 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       }
 
       if (hasAlerts && cachedArrivals) {
-        isAlertView = !isAlertView
         if (isAlertView) {
+          // Tap from alert view: refresh arrivals and return
+          isAlertView = false
+          refreshInPlace()
+        } else {
+          // Tap from arrivals view: show alerts
+          isAlertView = true
           await updateBody(renderAlertSummary(cachedArrivals, alerts, outages))
           await updateColumns('', '')
-        } else {
-          // Re-render from cache so the footer timestamp is current
-          // (replaying lastBodyText verbatim showed a stale clock — bug #5).
-          const rendered = await renderCurrentFromCache()
-          if (!rendered) await updateBody(lastBodyText)
         }
       } else {
         isAlertView = false

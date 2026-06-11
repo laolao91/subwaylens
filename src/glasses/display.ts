@@ -523,7 +523,7 @@ export function renderAlertSummary(
   }
 
   lines.push('━'.repeat(DIVIDER_WIDTH))
-  lines.push('tap:trains  dbl:exit')
+  lines.push('tap:refresh  dbl:exit')
 
   return lines.join('\n')
 }
