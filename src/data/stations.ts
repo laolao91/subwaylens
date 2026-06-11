@@ -88,4 +88,5 @@ export async function loadRegionStations(regionId: string): Promise<void> {
   allStations.push(...next)
   activeRegionId = region.id
   rebuildIndexes()
+  console.log(`[subwaylens] region ${region.id}: ${allStations.length} stations, lirr:237=${stationById.has('lirr:237')}`)
 }

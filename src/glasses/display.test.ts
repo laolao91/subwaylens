@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { renderLoading, renderNoStations, renderBody, branchAbbrev, bigNumberRows, renderGlanceBody } from './display'
+import { renderLoading, renderNoStations, renderBody, branchAbbrev, renderGlanceBody } from './display'
 import { registerSystemPack } from '../data/arrivals'
 import type { Station, StationArrivals } from '../lib/types'
 
@@ -103,6 +103,22 @@ describe('renderBody — departure board (LIRR)', () => {
     const text = renderBody(LIRR_STATION, empty, 0, 1, new Map())
     expect(text).toContain('No live data')
   })
+
+  it('drops trains terminating at this station (arrivals, not departures)', () => {
+    const now = Math.floor(Date.now() / 1000)
+    const withArrival: StationArrivals = {
+      stationId: 'lirr:237',
+      north: [
+        { route: '4', direction: 'N', stopId: '237', arrivalTime: now + 300, terminal: 'Penn Station', track: '21' },
+        { route: '1', direction: 'N', stopId: '237', arrivalTime: now + 600, terminal: 'Babylon' },
+      ],
+      south: [],
+      fetchedAt: now,
+    }
+    const text = renderBody(LIRR_STATION, withArrival, 0, 1, new Map())
+    expect(text).toContain('Babylon')
+    expect(text).not.toContain('Trk 21')
+  })
 })
 
 // ── No live data (feature #6 schedule fallback removed by request —
@@ -124,20 +140,6 @@ describe('renderBody — no live data', () => {
 
 // ── Glance mode ──
 
-describe('bigNumberRows', () => {
-  it('renders digits as 3 rows of equal width', () => {
-    const rows = bigNumberRows('12')
-    expect(rows).toHaveLength(3)
-    expect(rows[0].length).toBe(rows[1].length)
-    expect(rows[1].length).toBe(rows[2].length)
-  })
-
-  it('handles the no-data placeholder', () => {
-    const rows = bigNumberRows('--')
-    expect(rows[1]).toContain('_')
-  })
-})
-
 describe('renderGlanceBody', () => {
   const SUBWAY_STATION: Station = {
     id: '127', name: 'Times Sq-42 St', stops: ['127'], routes: ['1'],
@@ -155,7 +157,8 @@ describe('renderGlanceBody', () => {
     const text = renderGlanceBody(SUBWAY_STATION, arrivals)
     expect(text).toContain('▲')
     expect(text).toContain('▼')
-    expect(text).toContain('min')
+    expect(text).toContain('3 min')
+    expect(text).toContain('7 min')
     expect(text).toContain('tap:detail')
     expect(text.split('\n').length).toBeLessThanOrEqual(9)
   })
@@ -164,6 +167,6 @@ describe('renderGlanceBody', () => {
     const now = Math.floor(Date.now() / 1000)
     const arrivals: StationArrivals = { stationId: '127', north: [], south: [], fetchedAt: now }
     const text = renderGlanceBody(SUBWAY_STATION, arrivals)
-    expect(text).toContain('min')
+    expect(text).toContain('-- min')
   })
 })

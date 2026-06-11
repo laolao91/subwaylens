@@ -8,7 +8,12 @@ Feature release: LIRR + Metro-North departure boards, multi-city support, equipm
 
 ### New: High Readability Glance Mode
 
-- Settings toggle (default off): one giant next-train countdown per direction, built from 3-row block digits (the G2 SDK exposes no font-size control). Tap cycles glance → detail → alerts → glance.
+- Settings toggle (default off): a sparse one-countdown-per-direction view ("▶ 3 min") for at-a-glance reading while walking. Tap cycles glance → detail → alerts → glance. (Multi-row block digits were prototyped and rejected — the proportional LVGL font skews row-aligned art.)
+
+### Simulator-Verified Fixes
+
+- Departure boards no longer list trains terminating at the current station (seen live at Penn: a Ronkonkoma-branch arrival shown as a boardable departure).
+- Fixed a dev-mode crash in the @protobufjs/inquire stub (ESM/CJS interop) that broke the simulator workflow.
 
 ### New: Commuter Rail (LIRR + Metro-North)
 

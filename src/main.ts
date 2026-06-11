@@ -367,6 +367,8 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
   initStorage(b)
 
+  await applyDevSeed()
+
   await loadStations()
 
   const station = currentStation()
@@ -508,6 +510,34 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 }
 
 // ── Boot ──
+
+/**
+ * Dev-only simulator seeding: ?seed=nyc | nyc-glance presets favorites +
+ * settings through the storage wrapper (bridge-aware) so automated
+ * simulator checks can exercise real displays. Must run after
+ * initStorage(). Tree-shaken out of production builds.
+ */
+async function applyDevSeed(): Promise<void> {
+  if (!import.meta.env.DEV) return
+  const seed = new URLSearchParams(window.location.search).get('seed')
+  if (!seed) return
+  const { saveFavorites, saveSettings } = await import('./lib/storage')
+  const base = {
+    refreshInterval: 30, nearbyEnabled: false, nearbyRadius: 0.25,
+    hiddenRoutes: {}, regionId: 'nyc', glanceMode: false,
+  }
+  if (seed === 'nyc') {
+    await saveFavorites(['127', 'lirr:237'])
+    await saveSettings(base)
+  } else if (seed === 'nyc-glance') {
+    await saveFavorites(['127'])
+    await saveSettings({ ...base, glanceMode: true })
+  } else if (seed === 'lirr') {
+    await saveFavorites(['lirr:237'])
+    await saveSettings(base)
+  }
+  console.log(`[subwaylens] dev seed applied: ${seed}`)
+}
 
 async function main(): Promise<void> {
   try {

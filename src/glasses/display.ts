@@ -299,8 +299,13 @@ function renderDepartureBoard(
 
   lines.push('DEPARTURES')
 
-  // Arrivals collection put everything in `north` for departure-board systems.
-  const departures = arrivals.north.slice(0, MAX_DEPARTURES)
+  // Arrivals collection put everything in `north` for departure-board
+  // systems. Trains whose terminal IS this station are arrivals ending
+  // here, not boardable departures — drop them (seen live at Penn:
+  // "[RONK] Penn Station Trk 21").
+  const departures = arrivals.north
+    .filter((t) => t.terminal !== station.name)
+    .slice(0, MAX_DEPARTURES)
 
   if (departures.length === 0) {
     lines.push('  No live data')
@@ -347,47 +352,26 @@ function renderDepartureBoard(
   return lines.join('\n')
 }
 
-// ── Glance mode (high-readability big numbers) ──
+// ── Glance mode (high-readability sparse layout) ──
 
 /**
- * 3-row ASCII block digits. Plain ASCII (underscore/pipe/space) is the
- * only glyph set guaranteed in the G2 LVGL font — SDK 0.0.10 exposes no
- * per-container font size, so "big" text is built from rows.
- */
-const DIGIT_ROWS: Record<string, [string, string, string]> = {
-  '0': [' _ ', '| |', '|_|'],
-  '1': ['   ', '  |', '  |'],
-  '2': [' _ ', ' _|', '|_ '],
-  '3': [' _ ', ' _|', ' _|'],
-  '4': ['   ', '|_|', '  |'],
-  '5': [' _ ', '|_ ', ' _|'],
-  '6': [' _ ', '|_ ', '|_|'],
-  '7': [' _ ', '  |', '  |'],
-  '8': [' _ ', '|_|', '|_|'],
-  '9': [' _ ', '|_|', ' _|'],
-  '-': ['   ', ' _ ', '   '],
-}
-
-/** Render a short string ("12", "--") as three rows of block digits. */
-export function bigNumberRows(text: string): [string, string, string] {
-  const rows: [string, string, string] = ['', '', '']
-  for (const ch of text) {
-    const glyph = DIGIT_ROWS[ch] ?? ['   ', '   ', '   ']
-    for (let i = 0; i < 3; i++) rows[i] += glyph[i] + ' '
-  }
-  return rows
-}
-
-/**
- * Glance mode body: one giant next-train countdown per direction
- * (or per departure list for commuter rail). 9 lines total.
+ * Glance mode body: one next-train countdown per direction, surrounded
+ * by whitespace. 8 lines vs the detail view's ~12 — readability comes
+ * from sparseness.
  *
- *   ▲ Uptown [1]
- *      _
- *     | |  min      ← 3-row digits
- *     |_|
- *   ▼ Downtown [2]
- *   ...
+ * Multi-row ASCII "big digits" were prototyped and rejected: both the
+ * simulator and hardware LVGL fonts are proportional, which skews
+ * row-aligned art beyond recognition (verified in simulator 2026-06-10).
+ * True large digits need an image container — future enhancement.
+ *
+ *   ▲ 14 St [L]
+ *
+ *       ▶ 4 min
+ *
+ *   ▼ Canarsie-Rockaway Pkwy [L]
+ *
+ *       7 min
+ *
  *   tap:detail  dbl:exit
  */
 export function renderGlanceBody(
@@ -424,13 +408,15 @@ export function renderGlanceBody(
       ? ` [${routeDisplayName(systemId, sec.next.route)}]`
       : ''
     lines.push(`${sec.arrow} ${sec.label}${badge}`)
-    const minsText = sec.next
-      ? String(Math.min(99, minutesUntil(sec.next.arrivalTime, now)))
-      : '--'
-    const rows = bigNumberRows(minsText)
-    lines.push(`  ${rows[0]}`)
-    lines.push(`  ${rows[1]}  min`)
-    lines.push(`  ${rows[2]}`)
+    lines.push('')
+    if (sec.next) {
+      const mins = Math.min(99, minutesUntil(sec.next.arrivalTime, now))
+      const soon = isArrivingSoon(sec.next.arrivalTime, now)
+      lines.push(`      ${soon ? '▶ ' : ''}${mins} min`)
+    } else {
+      lines.push('      -- min')
+    }
+    lines.push('')
   }
 
   lines.push('tap:detail  dbl:exit')
