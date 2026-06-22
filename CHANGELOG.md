@@ -1,3 +1,12 @@
+## v1.8.1 — 2026-06-22
+
+Dependency/bug fix release, based on v1.6.2 (the layout/feel users know from the live Even Hub listing — the v1.7.x feature branch is not included).
+
+### Fixed
+
+- **Android location permission failures** — nearby-stations detection now calls the Even Hub SDK's native `getAppLocation()` bridge method first, falling back to `navigator.geolocation` only when no bridge is connected (plain browser/simulator preview). The native bridge channel isn't subject to the WebView geolocation-permission-forwarding gap that could block location on some Android installs.
+- Updated `@evenrealities/even_hub_sdk` to `^0.0.11` (requires Even Hub app 2.2.5+). `app.json` `min_sdk_version` bumped to match.
+
 ## v1.6.2 — 2026-06-09
 
 Bug fix release.

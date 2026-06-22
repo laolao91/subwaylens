@@ -147,7 +147,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 This project follows [Semantic Versioning](https://semver.org/). See [VERSIONING.md](VERSIONING.md) for the full policy.
 
-Current version: **1.5.4**
+Current version: **1.8.1**
 
 ## License
 

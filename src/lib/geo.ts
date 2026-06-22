@@ -1,13 +1,27 @@
 /**
  * GPS location + distance calculation helpers.
- * Uses WebView's navigator.geolocation API.
+ *
+ * Tries the Even Hub bridge's native getAppLocation() first — it talks
+ * directly to the host app over the same channel used for storage/display
+ * calls, so it isn't subject to the WebView geolocation-permission-forwarding
+ * gap that blocks navigator.geolocation on sideloaded/QR-installed Android
+ * builds. Falls back to navigator.geolocation when no bridge is connected
+ * (plain browser / simulator preview).
  */
 
+import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
+import { AppLocationAccuracy } from '@evenrealities/even_hub_sdk'
 import type { Station } from './types'
 
 export interface LatLng {
   lat: number
   lng: number
+}
+
+let bridge: EvenAppBridge | null = null
+
+export function initGeo(b: EvenAppBridge): void {
+  bridge = b
 }
 
 /**
@@ -60,11 +74,30 @@ export function nearbyStations(
 export type GeoError = 'permission-denied' | 'unavailable' | 'timeout'
 
 /**
- * Get current GPS position with typed error. maximumAge:60000 allows the
- * device to return a cached fix rather than waiting for a fresh GPS lock —
- * critical on Android where a cold GPS can take 10+ seconds.
+ * Ask the bridge for a fix. Returns null (rather than throwing) on any
+ * failure so callers fall through to the navigator.geolocation path.
  */
-export function getCurrentPositionDetailed(): Promise<LatLng | GeoError> {
+async function getPositionFromBridge(): Promise<LatLng | null> {
+  if (!bridge) return null
+  try {
+    const fix = await bridge.getAppLocation({
+      accuracy: AppLocationAccuracy.Medium,
+      timeoutMs: 10000,
+    })
+    if (!fix) return null
+    return { lat: fix.latitude, lng: fix.longitude }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * navigator.geolocation fallback, used when no bridge is connected.
+ * maximumAge:60000 allows the device to return a cached fix rather than
+ * waiting for a fresh GPS lock — critical on Android where a cold GPS can
+ * take 10+ seconds.
+ */
+function getPositionFromBrowser(): Promise<LatLng | GeoError> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
       resolve('unavailable')
@@ -82,6 +115,17 @@ export function getCurrentPositionDetailed(): Promise<LatLng | GeoError> {
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
     )
   })
+}
+
+/**
+ * Get current GPS position with typed error. Tries the bridge first; only
+ * falls back to the browser API (and its permission-denied/timeout detail)
+ * when the bridge is unavailable or returns no fix.
+ */
+export async function getCurrentPositionDetailed(): Promise<LatLng | GeoError> {
+  const viaBridge = await getPositionFromBridge()
+  if (viaBridge) return viaBridge
+  return getPositionFromBrowser()
 }
 
 /**

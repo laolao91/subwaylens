@@ -21,6 +21,7 @@ import {
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 
 import { initStorage } from './lib/storage'
+import { initGeo } from './lib/geo'
 import {
   loadStations,
   currentStation,
@@ -316,6 +317,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   bridge = b
 
   initStorage(b)
+  initGeo(b)
 
   await loadStations()
 

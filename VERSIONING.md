@@ -51,6 +51,10 @@ For testing builds before a release, use pre-release identifiers:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.8.1 | 2026-06-22 | Based on v1.6.2 (not the v1.7.x feature branch). Fixed Android location-permission failures by switching to the SDK's native `getAppLocation()` bridge call, with `navigator.geolocation` fallback. SDK bumped to 0.0.11 (requires Even Hub app 2.2.5+). |
+| 1.6.2 | 2026-06-09 | Favorites display no longer blocks on GPS. |
+| 1.6.1 | 2026-06-09 | Snapshot of submitted build. |
+| 1.6.0 | 2026-05-23 | Warm cache, delay/stale indicators, route filters, live preview, unit tests. |
 | 1.5.4 | 2026-05-02 | Reliability and code-quality: race condition fix, feed fetch timeouts, centralised station data, extracted helpers, drag cleanup, version wired to package.json. |
 | 1.5.3 | 2026-04-18 | Dependency maintenance: SDK 0.0.10, CLI 0.1.12, protobufjs security fix, npm 11.12.1. |
 | 1.5.2 | 2026-04-14 | Handle ABNORMAL_EXIT_EVENT to stop auto-refresh on unexpected disconnect. |

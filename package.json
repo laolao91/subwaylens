@@ -1,6 +1,6 @@
 {
   "name": "subwaylens",
-  "version": "1.6.2",
+  "version": "1.8.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.10",
+    "@evenrealities/even_hub_sdk": "^0.0.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "even-toolkit": "^1.7.0",
