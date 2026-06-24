@@ -21,7 +21,6 @@ import {
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 
 import { initStorage } from './lib/storage'
-import { initGeo } from './lib/geo'
 import {
   loadStations,
   currentStation,
@@ -157,7 +156,7 @@ async function updateBody(text: string): Promise<void> {
       containerID: BODY_ID,
       containerName: BODY_NAME,
       contentOffset: 0,
-      contentLength: 2000,
+      contentLength: 0,
       content: text,
     })
   )
@@ -170,7 +169,7 @@ async function updateHeader(text: string): Promise<void> {
       containerID: HEADER_ID,
       containerName: HEADER_NAME,
       contentOffset: 0,
-      contentLength: 1000,
+      contentLength: 0,
       content: text,
     })
   )
@@ -317,7 +316,6 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   bridge = b
 
   initStorage(b)
-  initGeo(b)
 
   await loadStations()
 
@@ -354,12 +352,12 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
 
     onScrollDown: async () => {
       nextStation()
-      displayCurrentStation(true)
+      await displayCurrentStation(true)
     },
 
     onScrollUp: async () => {
       prevStation()
-      displayCurrentStation(true)
+      await displayCurrentStation(true)
     },
 
     onTap: async () => {
@@ -387,7 +385,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
         }
       } else {
         isAlertView = false
-        refreshInPlace()
+        await refreshInPlace()
       }
     },
 

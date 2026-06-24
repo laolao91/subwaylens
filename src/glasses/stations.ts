@@ -202,29 +202,8 @@ export function applyRouteFilter(
 }
 
 /**
- * Get the set of hidden route IDs for a station (from cached settings).
- */
-export function getHiddenRouteSet(stationId: string): Set<string> {
-  return new Set(cachedSettings?.hiddenRoutes?.[stationId] ?? [])
-}
-
-/**
  * Check if a station is a favorite.
  */
 export function isFavorite(stationId: string): boolean {
   return state.favoriteIds.has(stationId)
-}
-
-/**
- * Get all stations for search/settings.
- */
-export function getAllStations(): Station[] {
-  return allStations
-}
-
-/**
- * Get a station by ID.
- */
-export function getStationById(id: string): Station | undefined {
-  return stationById.get(id)
 }

@@ -1,9 +1,8 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import {
   distanceMiles,
   nearbyStations,
-  initGeo,
   getCurrentPositionDetailed,
   getCurrentPosition,
 } from './geo'
@@ -65,20 +64,21 @@ function fakeBridge(getAppLocation: EvenAppBridge['getAppLocation']): EvenAppBri
   return { getAppLocation } as unknown as EvenAppBridge
 }
 
-describe('getCurrentPositionDetailed (bridge-first)', () => {
+describe('getCurrentPositionDetailed (bridge-first via EvenAppBridge.getInstance())', () => {
   afterEach(() => {
-    // Reset the module-level bridge singleton between tests.
-    initGeo(null as unknown as EvenAppBridge)
+    vi.restoreAllMocks()
   })
 
-  it('uses the bridge fix when getAppLocation resolves', async () => {
-    initGeo(fakeBridge(async () => ({ latitude: 40.758, longitude: -73.9855 })))
+  it('uses the bridge fix when getAppLocation resolves, with no prior init call needed', async () => {
+    vi.spyOn(EvenAppBridge, 'getInstance').mockReturnValue(
+      fakeBridge(async () => ({ latitude: 40.758, longitude: -73.9855 }))
+    )
     const pos = await getCurrentPositionDetailed()
     expect(pos).toEqual({ lat: 40.758, lng: -73.9855 })
   })
 
   it('falls back to navigator.geolocation when the bridge returns null', async () => {
-    initGeo(fakeBridge(async () => null))
+    vi.spyOn(EvenAppBridge, 'getInstance').mockReturnValue(fakeBridge(async () => null))
     const original = navigator.geolocation
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
@@ -96,7 +96,9 @@ describe('getCurrentPositionDetailed (bridge-first)', () => {
   })
 
   it('falls back to navigator.geolocation when the bridge throws', async () => {
-    initGeo(fakeBridge(async () => { throw new Error('bridge unavailable') }))
+    vi.spyOn(EvenAppBridge, 'getInstance').mockReturnValue(
+      fakeBridge(async () => { throw new Error('bridge unavailable') })
+    )
     const original = navigator.geolocation
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
@@ -108,7 +110,7 @@ describe('getCurrentPositionDetailed (bridge-first)', () => {
   })
 
   it('getCurrentPosition resolves null (not an error string) when nothing is available', async () => {
-    initGeo(fakeBridge(async () => null))
+    vi.spyOn(EvenAppBridge, 'getInstance').mockReturnValue(fakeBridge(async () => null))
     const original = navigator.geolocation
     Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined })
     const pos = await getCurrentPosition()

@@ -32,11 +32,11 @@ export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbySt
   const detect = useCallback(async () => {
     setGpsState({ status: 'loading' })
 
-    if (!navigator.geolocation) {
-      setGpsState({ status: 'unavailable' })
-      return
-    }
-
+    // No upfront navigator.geolocation check here — getCurrentPositionDetailed()
+    // tries the Even Hub bridge first and only needs navigator.geolocation for
+    // its own fallback path, so bailing out early here would skip the bridge
+    // path entirely on any device where navigator.geolocation is unavailable
+    // but the bridge works fine.
     const pos = await getCurrentPositionDetailed()
     if (pos === 'permission-denied') {
       setGpsState({ status: 'denied' })

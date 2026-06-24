@@ -5,23 +5,25 @@
  * directly to the host app over the same channel used for storage/display
  * calls, so it isn't subject to the WebView geolocation-permission-forwarding
  * gap that blocks navigator.geolocation on sideloaded/QR-installed Android
- * builds. Falls back to navigator.geolocation when no bridge is connected
- * (plain browser / simulator preview).
+ * builds. Falls back to navigator.geolocation when the bridge call doesn't
+ * produce a fix (e.g. no native host attached, such as a plain browser or
+ * simulator preview).
+ *
+ * Uses EvenAppBridge.getInstance() directly rather than an injected
+ * singleton: the bridge is created on import and getInstance() always
+ * returns it immediately (confirmed in this project's own tests.md notes on
+ * SDK behavior), so this has no dependency on main.ts's boot order. That
+ * matters because the phone settings page mounts independently of — and can
+ * run its own GPS detection before — main.ts finishes awaiting
+ * waitForEvenAppBridge() for the glasses-display path.
  */
 
-import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import { AppLocationAccuracy } from '@evenrealities/even_hub_sdk'
+import { EvenAppBridge, AppLocationAccuracy } from '@evenrealities/even_hub_sdk'
 import type { Station } from './types'
 
 export interface LatLng {
   lat: number
   lng: number
-}
-
-let bridge: EvenAppBridge | null = null
-
-export function initGeo(b: EvenAppBridge): void {
-  bridge = b
 }
 
 /**
@@ -78,9 +80,8 @@ export type GeoError = 'permission-denied' | 'unavailable' | 'timeout'
  * failure so callers fall through to the navigator.geolocation path.
  */
 async function getPositionFromBridge(): Promise<LatLng | null> {
-  if (!bridge) return null
   try {
-    const fix = await bridge.getAppLocation({
+    const fix = await EvenAppBridge.getInstance().getAppLocation({
       accuracy: AppLocationAccuracy.Medium,
       timeoutMs: 10000,
     })
