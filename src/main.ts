@@ -17,8 +17,9 @@ import {
   TextContainerProperty,
   RebuildPageContainer,
   TextContainerUpgrade,
+  DeviceConnectType,
 } from '@evenrealities/even_hub_sdk'
-import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
+import type { EvenAppBridge, DeviceStatus } from '@evenrealities/even_hub_sdk'
 
 import { initStorage } from './lib/storage'
 import {
@@ -56,6 +57,8 @@ const BODY_NAME = 'body'
 let bridge: EvenAppBridge | null = null
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let inputUnsub: (() => void) | null = null
+let deviceStatusUnsub: (() => void) | null = null
+let lastDeviceStatus: DeviceStatus | null = null
 
 let lastBodyText = ''
 
@@ -284,6 +287,26 @@ async function restoreNormalDisplay(): Promise<void> {
   } else {
     await refreshInPlace()
   }
+}
+
+/**
+ * Decide whether a timer-driven auto-refresh tick should be skipped.
+ *
+ * Fails open: a `null` status (no DeviceStatus received yet) or any
+ * `undefined` field never causes a skip — only an explicit disconnected/
+ * non-connected `connectType` or `isWearing === false` does. This never
+ * gates the manual tap-triggered refresh path, only the setInterval tick
+ * in startAutoRefresh().
+ */
+export function shouldSkipAutoRefresh(status: DeviceStatus | null): boolean {
+  if (!status) return false
+  if (status.connectType !== undefined && status.connectType !== DeviceConnectType.Connected) {
+    return true
+  }
+  if (status.isWearing === false) {
+    return true
+  }
+  return false
 }
 
 // ── Auto-refresh ──
