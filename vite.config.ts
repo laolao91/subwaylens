@@ -11,7 +11,7 @@ export default defineConfig({
       // eval() to dynamically require() optional Node.js modules — that path
       // is never reached in a bundled browser build, but the EvenHub static
       // scanner flags any eval() in the bundle regardless.
-      '@protobufjs/inquire': path.resolve(__dirname, 'src/lib/inquire-stub.ts'),
+      '@protobufjs/inquire': path.resolve(__dirname, 'src/lib/inquire-stub.cjs'),
     },
   },
   server: {
