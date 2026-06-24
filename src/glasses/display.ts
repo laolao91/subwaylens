@@ -138,6 +138,22 @@ function directionLabel(trains: TrainArrival[], fallback: string): string {
 }
 
 /**
+ * Format a direction-arrow line, appending the borough code only if it
+ * fits within CHARS_PER_LINE. Preserves the full station/terminal name
+ * over the borough tag when space is tight, rather than truncating it.
+ */
+export function formatDirectionLine(
+  arrow: string,
+  label: string,
+  borough: string
+): string {
+  const base = `${arrow} ${label}`
+  if (!borough) return base
+  const withBorough = `${base} - ${borough}`
+  return withBorough.length <= CHARS_PER_LINE ? withBorough : base
+}
+
+/**
  * Collect all route IDs present in an arrivals object.
  */
 function routeIdsFromArrivals(arrivals: StationArrivals): string[] {
@@ -166,10 +182,7 @@ export function renderBody(
   // North direction
   const northTrains = arrivals.north.slice(0, MAX_TRAINS)
   const northLabel = directionLabel(northTrains, station.north)
-  lines.push(`▲ ${northLabel}`)
-
-  const northBorough = getBoroughCode(northLabel)
-  if (northBorough) lines.push(northBorough)
+  lines.push(formatDirectionLine('▲', northLabel, getBoroughCode(northLabel)))
 
   if (northTrains.length === 0) {
     lines.push('  No live data')
@@ -179,16 +192,14 @@ export function renderBody(
     }
   }
 
-  // Solid heavy divider between directions
-  lines.push('━'.repeat(DIVIDER_WIDTH))
+  // Light divider between directions (thinner than the heavy ━ used
+  // for the progress bar's filled portion, where weight is meaningful).
+  lines.push('─'.repeat(DIVIDER_WIDTH))
 
   // South direction
   const southTrains = arrivals.south.slice(0, MAX_TRAINS)
   const southLabel = directionLabel(southTrains, station.south)
-  lines.push(`▼ ${southLabel}`)
-
-  const southBorough = getBoroughCode(southLabel)
-  if (southBorough) lines.push(southBorough)
+  lines.push(formatDirectionLine('▼', southLabel, getBoroughCode(southLabel)))
 
   if (southTrains.length === 0) {
     lines.push('  No live data')
