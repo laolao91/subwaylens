@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { DeviceStatus, DeviceConnectType } from '@evenrealities/even_hub_sdk'
 import type { EvenAppBridge as EvenAppBridgeType } from '@evenrealities/even_hub_sdk'
+import * as stations from './glasses/stations'
+import type { Station } from './lib/types'
 
 // main.ts imports ./settings/settings-mount at module scope, which pulls in
 // the React settings page tree and even-toolkit/web. even-toolkit's own
@@ -17,7 +19,36 @@ vi.mock('./settings/settings-mount', () => ({
   initSettingsPage: vi.fn(),
 }))
 
-const { shouldSkipAutoRefresh, startGlassesModeForTest } = await import('./main')
+vi.mock('./glasses/stations', async () => {
+  const actual = await vi.importActual<typeof import('./glasses/stations')>('./glasses/stations')
+  return {
+    ...actual,
+    currentStation: vi.fn(),
+    refreshCurrentArrivals: vi.fn(),
+    refreshAlerts: vi.fn(),
+    getCachedAlerts: vi.fn(() => new Map()),
+    getState: vi.fn(() => ({
+      stations: [],
+      favoriteIds: new Set(),
+      currentIndex: 0,
+      arrivals: new Map(),
+      alerts: new Map(),
+    })),
+    applyRouteFilter: vi.fn((arrivals: unknown) => arrivals),
+    isFavorite: vi.fn(() => false),
+  }
+})
+
+const {
+  shouldSkipAutoRefresh,
+  startGlassesModeForTest,
+  startAutoRefresh,
+  stopAutoRefresh,
+} = await import('./main')
+
+function makeStation(id: string): Station {
+  return { id, name: id, stops: [], routes: [], lat: 0, lng: 0, north: '', south: '' }
+}
 
 // DeviceStatus's real constructor backfills connectType to
 // DeviceConnectType.None and isWearing to false when omitted from the
@@ -153,5 +184,89 @@ describe('onDeviceStatusChanged subscription (via startGlassesModeForTest)', () 
     }))
 
     expect(shouldSkipAutoRefresh(getLastStatus())).toBe(false)
+  })
+})
+
+describe('startAutoRefresh timer gating', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.mocked(stations.currentStation).mockReturnValue(makeStation('times-sq'))
+    vi.mocked(stations.refreshCurrentArrivals).mockResolvedValue({
+      stationId: 'times-sq',
+      north: [],
+      south: [],
+      fetchedAt: 0,
+    })
+    vi.mocked(stations.refreshAlerts).mockResolvedValue(new Map())
+  })
+
+  afterEach(() => {
+    stopAutoRefresh()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('does not call refreshCurrentArrivals on a timer tick when disconnected', async () => {
+    const { bridge, emitStatus } = fakeBridge()
+    startGlassesModeForTest(bridge)
+    emitStatus(new DeviceStatus({
+      sn: 'sn-1',
+      connectType: DeviceConnectType.Disconnected,
+      isWearing: true,
+    }))
+
+    await startAutoRefresh()
+    vi.mocked(stations.refreshCurrentArrivals).mockClear()
+
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(stations.refreshCurrentArrivals).not.toHaveBeenCalled()
+  })
+
+  it('does not call refreshCurrentArrivals on a timer tick when not wearing', async () => {
+    const { bridge, emitStatus } = fakeBridge()
+    startGlassesModeForTest(bridge)
+    emitStatus(new DeviceStatus({
+      sn: 'sn-1',
+      connectType: DeviceConnectType.Connected,
+      isWearing: false,
+    }))
+
+    await startAutoRefresh()
+    vi.mocked(stations.refreshCurrentArrivals).mockClear()
+
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(stations.refreshCurrentArrivals).not.toHaveBeenCalled()
+  })
+
+  it('calls refreshCurrentArrivals on a timer tick when connected and wearing', async () => {
+    const { bridge, emitStatus } = fakeBridge()
+    startGlassesModeForTest(bridge)
+    emitStatus(new DeviceStatus({
+      sn: 'sn-1',
+      connectType: DeviceConnectType.Connected,
+      isWearing: true,
+    }))
+
+    await startAutoRefresh()
+    vi.mocked(stations.refreshCurrentArrivals).mockClear()
+
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(stations.refreshCurrentArrivals).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls refreshCurrentArrivals on a timer tick when no status has been received yet (fail open)', async () => {
+    const { bridge } = fakeBridge()
+    startGlassesModeForTest(bridge)
+    // No emitStatus call — lastDeviceStatus stays null.
+
+    await startAutoRefresh()
+    vi.mocked(stations.refreshCurrentArrivals).mockClear()
+
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(stations.refreshCurrentArrivals).toHaveBeenCalledTimes(1)
   })
 })

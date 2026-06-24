@@ -311,15 +311,16 @@ export function shouldSkipAutoRefresh(status: DeviceStatus | null): boolean {
 
 // ── Auto-refresh ──
 
-async function startAutoRefresh(): Promise<void> {
+export async function startAutoRefresh(): Promise<void> {
   stopAutoRefresh()
   const settings = await getSettings()
   refreshTimer = setInterval(() => {
+    if (shouldSkipAutoRefresh(lastDeviceStatus)) return
     refreshInPlace()
   }, settings.refreshInterval * 1000)
 }
 
-function stopAutoRefresh(): void {
+export function stopAutoRefresh(): void {
   if (refreshTimer) {
     clearInterval(refreshTimer)
     refreshTimer = null
