@@ -8,6 +8,7 @@ export interface Station {
   lng: number
   north: string      // direction label (e.g. "Uptown", "Manhattan")
   south: string      // direction label (e.g. "Downtown", "Brooklyn")
+  system?: 'lirr' | 'mnr'  // absent = NYC subway; commuter-rail systems set this
 }
 
 /** A single upcoming train arrival */
@@ -18,6 +19,7 @@ export interface TrainArrival {
   arrivalTime: number  // Unix timestamp (seconds)
   terminal: string     // last stop name
   delay?: number       // seconds behind schedule (from GTFS-RT, absent when on time)
+  track?: string       // LIRR/MNR track assignment from the MTARR GTFS-RT extension; absent for subway or unposted tracks
 }
 
 /** Arrivals grouped for a station */
