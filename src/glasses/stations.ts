@@ -6,6 +6,7 @@
  */
 import { allStations, stationById } from '../data/stations'
 import { getStationArrivals } from '../data/mta-feeds'
+import { getCommuterArrivals } from '../data/arrivals-commuter'
 import { fetchAlerts } from '../data/alerts'
 import { getFavorites, getSettings } from '../lib/storage'
 import { getCurrentPosition, nearbyStations } from '../lib/geo'
@@ -36,6 +37,18 @@ let state: StationManagerState = {
 // Cached settings so route-filter lookups don't require async reads on every display call.
 // Updated whenever loadStations() runs.
 let cachedSettings: AppSettings | null = null
+
+/**
+ * Dispatch arrival fetching by station.system: subway stations (system
+ * undefined) use the stop-suffix mta-feeds.ts path; LIRR/MNR stations use
+ * the direction-id arrivals-commuter.ts path. Exported for direct testing.
+ */
+export async function dispatchGetArrivals(station: Station): Promise<StationArrivals> {
+  if (station.system === 'lirr' || station.system === 'mnr') {
+    return getCommuterArrivals(station)
+  }
+  return getStationArrivals(station)
+}
 
 /**
  * Returns a shallow copy of state so callers cannot accidentally mutate
@@ -152,7 +165,7 @@ export function prevStation(): Station | null {
 export async function refreshCurrentArrivals(): Promise<StationArrivals | null> {
   const station = currentStation()
   if (!station) return null
-  const arrivals = await getStationArrivals(station)
+  const arrivals = await dispatchGetArrivals(station)
   state.arrivals.set(station.id, arrivals)
   return arrivals
 }
@@ -176,7 +189,7 @@ export async function prefetchAllStations(): Promise<void> {
   await Promise.all(
     state.stations.map(async (station) => {
       try {
-        const arrivals = await getStationArrivals(station)
+        const arrivals = await dispatchGetArrivals(station)
         state.arrivals.set(station.id, arrivals)
       } catch {
         // Silently skip — stale or empty cache is fine
