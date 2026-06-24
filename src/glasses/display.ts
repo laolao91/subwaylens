@@ -16,11 +16,12 @@
  */
 
 import type { Station, StationArrivals, TrainArrival } from '../lib/types'
-import { formatArrival, isArrivingSoon } from '../lib/time'
+import { formatArrival, isArrivingSoon, minutesUntil } from '../lib/time'
 import { TERMINAL_ABBREVS } from '../data/terminal-abbrevs'
 import { getBoroughCode } from '../data/boroughs'
 import type { RouteAlert } from '../data/alerts'
 import { alertsForRoutes, routeHasAlert } from '../data/alerts'
+import { routeDisplayName } from '../data/arrivals-commuter'
 
 /** Max trains per direction to show */
 const MAX_TRAINS = 3
@@ -38,6 +39,16 @@ const DIVIDER_WIDTH = 26
 
 /** Fixed terminal name display width — pads short names, truncates long ones */
 const TERMINAL_WIDTH = 15
+
+/** Max departures shown on a departure board (single list, no direction split). */
+const MAX_DEPARTURES = 6
+
+/** Departure-board terminal column width when route badges are short (<=3 chars). */
+const BOARD_TERMINAL_WIDTH_WIDE = 15
+
+/** Departure-board terminal column width when any route badge exceeds 3 chars
+ *  (track column needs the extra room — same rule validated in the v1.7.0 mockup). */
+const BOARD_TERMINAL_WIDTH_NARROW = 12
 
 /**
  * Format a Date as a compact H:MMa/p string (e.g. "10:24a", "3:07p").
@@ -304,5 +315,92 @@ export function renderNoStations(): string {
   lines.push('')
   lines.push('  Open settings on your')
   lines.push('  phone to add stations.')
+  return lines.join('\n')
+}
+
+/**
+ * Abbreviate a branch/route display name to a compact badge.
+ * Multi-word: first letter + first 3 of second word ("Port Jefferson" → "PJEF").
+ * Single word: first 4 ("Ronkonkoma" → "RONK").
+ */
+function branchAbbrev(display: string): string {
+  const words = display.toUpperCase().replace(/[^A-Z0-9 ]/g, '').split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '????'
+  if (words.length >= 2) return words[0][0] + words[1].slice(0, 3)
+  return words[0].slice(0, 4)
+}
+
+/**
+ * Render the commuter-rail departure board: one time-sorted list with
+ * branch badges and track numbers. Tracks show "Trk --" until the MTARR
+ * extension posts them (~10 min before departure at terminals). The
+ * terminal column shrinks from 15 to 12 chars when any visible badge
+ * exceeds 3 chars, making room for the track field — same rule as the
+ * validated v1.7.0 mockup:
+ *
+ *   Penn Station LIRR ★           10:24a
+ *   DEPARTURES
+ *   ▶[RONK] Ronkonkoma   Trk 18  12m-10:36
+ *    [PJEF] Pt Jefferson Trk 20  +4m late
+ *    [BABL] Babylon      Trk 15  19m-10:43
+ *    [HEMP] Hempstead    Trk --  24m-10:48
+ *   ━━━━━━━━━━━━━━━ 3/5
+ *   10:23a  tap:refresh  dbl:exit
+ *
+ * Sorts by arrivalTime ascending before display — callers (e.g. the live
+ * fetch path in arrivals-commuter.ts) already sort, but this function
+ * sorts defensively so the rendered order is correct regardless of input.
+ */
+export function renderDepartureBoard(
+  station: Station,
+  arrivals: StationArrivals
+): string {
+  const now = Math.floor(Date.now() / 1000)
+  const system = station.system === 'mnr' ? 'mnr' : 'lirr'
+  const lines: string[] = []
+
+  lines.push('DEPARTURES')
+
+  const departures = [...arrivals.north]
+    .sort((a, b) => a.arrivalTime - b.arrivalTime)
+    .slice(0, MAX_DEPARTURES)
+
+  if (departures.length === 0) {
+    lines.push('  No live data')
+  } else {
+    const badges = departures.map((t) => branchAbbrev(routeDisplayName(system, t.route)))
+    const terminalWidth = badges.some((b) => b.length > 3)
+      ? BOARD_TERMINAL_WIDTH_NARROW
+      : BOARD_TERMINAL_WIDTH_WIDE
+
+    departures.forEach((t, i) => {
+      const badge = `[${badges[i]}]`
+      const rawTerminal = t.delay && t.delay > 60
+        ? `+${Math.round(t.delay / 60)}m late`
+        : t.terminal
+      const terminal = rawTerminal.length > terminalWidth
+        ? rawTerminal.slice(0, terminalWidth - 1) + '.'
+        : rawTerminal.padEnd(terminalWidth, ' ')
+      const track = t.track ? `Trk ${t.track}`.padEnd(6, ' ').slice(0, 6) : 'Trk --'
+      const mins = minutesUntil(t.arrivalTime, now)
+      const clock = formatArrival(t.arrivalTime, now).split(' - ')[1] ?? formatArrival(t.arrivalTime, now).replace('NOW ', '')
+      const time = mins === 0 ? `NOW ${clock}` : `${mins}m-${clock}`
+      const marker = isArrivingSoon(t.arrivalTime, now) ? '▶' : ' '
+
+      const left = `${marker}${badge} ${terminal} ${track}`
+      const gap = Math.max(1, CHARS_PER_LINE - left.length - time.length)
+      lines.push(left + ' '.repeat(gap) + time)
+    })
+  }
+
+  // Footer — no alert toggle for commuter rail (alerts feed is subway-only).
+  const ageSecs = now - arrivals.fetchedAt
+  if (ageSecs > 120) {
+    lines.push(`! ${Math.floor(ageSecs / 60)}m old  tap:refresh  dbl:exit`)
+  } else {
+    const fetchStr = formatClockTime(new Date(arrivals.fetchedAt * 1000))
+    lines.push(`${fetchStr}  tap:refresh  dbl:exit`)
+  }
+
   return lines.join('\n')
 }

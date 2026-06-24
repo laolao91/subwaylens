@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { renderLoading, renderNoStations, formatDirectionLine } from './display'
+import { renderLoading, renderNoStations, formatDirectionLine, renderDepartureBoard } from './display'
+import type { Station, StationArrivals, TrainArrival } from '../lib/types'
 
 // Note: renderHeader and renderBody require Station / StationArrivals objects
 // which pull in the full stations.json bundle. These pure-function tests cover
@@ -58,5 +59,95 @@ describe('formatDirectionLine', () => {
     const result = formatDirectionLine('▲', label, 'QNS')
     expect(result).toBe(`▲ ${label}`)
     expect(result).not.toContain('QNS')
+  })
+})
+
+function makeLirrStation(overrides: Partial<Station> = {}): Station {
+  return {
+    id: 'lirr:237',
+    name: 'Penn Station',
+    stops: ['237'],
+    routes: ['1', '4'],
+    lat: 40.75058844,
+    lng: -73.99358408,
+    north: 'Ronkonkoma',
+    south: 'Penn Station',
+    system: 'lirr',
+    ...overrides,
+  }
+}
+
+function makeArrival(overrides: Partial<TrainArrival> = {}): TrainArrival {
+  return {
+    route: '4',
+    direction: 'N',
+    stopId: '237',
+    arrivalTime: 1750000000,
+    terminal: 'Ronkonkoma',
+    ...overrides,
+  }
+}
+
+function makeArrivals(north: TrainArrival[], fetchedAt = 1750000000 - 60): StationArrivals {
+  return { stationId: 'lirr:237', north, south: [], fetchedAt }
+}
+
+describe('renderDepartureBoard', () => {
+  it('renders DEPARTURES header and a normal list of entries with tracks', () => {
+    const station = makeLirrStation()
+    const now = 1750000000
+    const arrivals = makeArrivals([
+      makeArrival({ route: '4', terminal: 'Ronkonkoma', arrivalTime: now + 12 * 60, track: '18' }),
+      makeArrival({ route: '5', terminal: 'Babylon', arrivalTime: now + 19 * 60, track: '15' }),
+    ])
+    const text = renderDepartureBoard(station, arrivals)
+    expect(text).toContain('DEPARTURES')
+    expect(text).toContain('Trk 18')
+    expect(text).toContain('Trk 15')
+    expect(text).toContain('tap:refresh')
+    expect(text).toContain('dbl:exit')
+  })
+
+  it('shows "Trk --" when a departure has no posted track yet', () => {
+    const station = makeLirrStation()
+    const arrivals = makeArrivals([
+      makeArrival({ route: '2', terminal: 'Hempstead', arrivalTime: 1750000000 + 24 * 60, track: undefined }),
+    ])
+    const text = renderDepartureBoard(station, arrivals)
+    expect(text).toContain('Trk --')
+  })
+
+  it('shows the empty/no-live-data state when there are no departures', () => {
+    const station = makeLirrStation()
+    const arrivals = makeArrivals([])
+    const text = renderDepartureBoard(station, arrivals)
+    expect(text).toContain('No live data')
+  })
+
+  it('limits to a maximum of 6 entries', () => {
+    const station = makeLirrStation()
+    const now = 1750000000
+    const many = Array.from({ length: 10 }, (_, i) =>
+      makeArrival({ route: '4', terminal: 'Ronkonkoma', arrivalTime: now + (i + 1) * 60, track: String(i + 1) })
+    )
+    const arrivals = makeArrivals(many)
+    const text = renderDepartureBoard(station, arrivals)
+    const trkLines = text.split('\n').filter((l) => l.includes('Trk'))
+    expect(trkLines.length).toBeLessThanOrEqual(6)
+  })
+
+  it('sorts entries by arrival time ascending', () => {
+    const station = makeLirrStation()
+    const now = 1750000000
+    const arrivals = makeArrivals([
+      makeArrival({ route: '5', terminal: 'Babylon', arrivalTime: now + 30 * 60, track: '15' }),
+      makeArrival({ route: '4', terminal: 'Ronkonkoma', arrivalTime: now + 5 * 60, track: '18' }),
+    ])
+    const text = renderDepartureBoard(station, arrivals)
+    const trkLineIndexes = text.split('\n')
+      .map((line, i) => ({ line, i }))
+      .filter(({ line }) => line.includes('Trk'))
+    expect(trkLineIndexes[0].line).toContain('Trk 18') // 5min entry first
+    expect(trkLineIndexes[1].line).toContain('Trk 15')
   })
 })
