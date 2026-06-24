@@ -370,6 +370,11 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   }
 
   // Store the unsub handle so re-entry is safe (teardown before re-registering).
+  if (deviceStatusUnsub) deviceStatusUnsub()
+  deviceStatusUnsub = b.onDeviceStatusChanged((status) => {
+    lastDeviceStatus = status
+  })
+
   if (inputUnsub) inputUnsub()
   inputUnsub = setupInput(b, {
 
@@ -456,6 +461,24 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       updateBody(bodyText)
     })
   })
+}
+
+/**
+ * Test-only entry point: runs the device-status subscription half of
+ * startGlassesMode() against a minimal fake bridge, without the full
+ * page-container/station bootstrap (which needs a real DOM/bridge stack).
+ * Returns a getter for the current lastDeviceStatus so tests can assert
+ * on it via the public shouldSkipAutoRefresh() function rather than
+ * reaching into module internals directly.
+ */
+export function startGlassesModeForTest(
+  fakeBridge: Pick<EvenAppBridge, 'onDeviceStatusChanged'>
+): () => DeviceStatus | null {
+  if (deviceStatusUnsub) deviceStatusUnsub()
+  deviceStatusUnsub = fakeBridge.onDeviceStatusChanged((status) => {
+    lastDeviceStatus = status
+  })
+  return () => lastDeviceStatus
 }
 
 // ── Boot ──

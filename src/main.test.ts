@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { DeviceStatus, DeviceConnectType } from '@evenrealities/even_hub_sdk'
+import type { EvenAppBridge as EvenAppBridgeType } from '@evenrealities/even_hub_sdk'
 
 // main.ts imports ./settings/settings-mount at module scope, which pulls in
 // the React settings page tree and even-toolkit/web. even-toolkit's own
@@ -16,7 +17,7 @@ vi.mock('./settings/settings-mount', () => ({
   initSettingsPage: vi.fn(),
 }))
 
-const { shouldSkipAutoRefresh } = await import('./main')
+const { shouldSkipAutoRefresh, startGlassesModeForTest } = await import('./main')
 
 // DeviceStatus's real constructor backfills connectType to
 // DeviceConnectType.None and isWearing to false when omitted from the
@@ -98,5 +99,59 @@ describe('shouldSkipAutoRefresh', () => {
       isWearing: true,
     })
     expect(shouldSkipAutoRefresh(status)).toBe(false)
+  })
+})
+
+function fakeBridge() {
+  const statusCallbacks: Array<(status: DeviceStatus) => void> = []
+  const bridge = {
+    onDeviceStatusChanged: vi.fn((cb: (status: DeviceStatus) => void) => {
+      statusCallbacks.push(cb)
+      return () => {
+        const idx = statusCallbacks.indexOf(cb)
+        if (idx !== -1) statusCallbacks.splice(idx, 1)
+      }
+    }),
+  }
+  return {
+    bridge: bridge as unknown as EvenAppBridgeType,
+    emitStatus: (status: DeviceStatus) => {
+      statusCallbacks.forEach(cb => cb(status))
+    },
+  }
+}
+
+describe('onDeviceStatusChanged subscription (via startGlassesModeForTest)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('registers exactly one onDeviceStatusChanged listener', () => {
+    const { bridge } = fakeBridge()
+    startGlassesModeForTest(bridge)
+    expect((bridge.onDeviceStatusChanged as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+  })
+
+  it('updates lastDeviceStatus via shouldSkipAutoRefresh-visible state when status changes', () => {
+    const { bridge, emitStatus } = fakeBridge()
+    const getLastStatus = startGlassesModeForTest(bridge)
+
+    expect(shouldSkipAutoRefresh(getLastStatus())).toBe(false)
+
+    emitStatus(new DeviceStatus({
+      sn: 'sn-1',
+      connectType: DeviceConnectType.Disconnected,
+      isWearing: true,
+    }))
+
+    expect(shouldSkipAutoRefresh(getLastStatus())).toBe(true)
+
+    emitStatus(new DeviceStatus({
+      sn: 'sn-1',
+      connectType: DeviceConnectType.Connected,
+      isWearing: true,
+    }))
+
+    expect(shouldSkipAutoRefresh(getLastStatus())).toBe(false)
   })
 })
