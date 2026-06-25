@@ -22,6 +22,8 @@ import {
 import type { EvenAppBridge, DeviceStatus } from '@evenrealities/even_hub_sdk'
 
 import { initStorage } from './lib/storage'
+import type { Station } from './lib/types'
+import type { RouteAlert } from './data/alerts'
 import {
   loadStations,
   currentStation,
@@ -316,6 +318,21 @@ export function shouldSkipAutoRefresh(status: DeviceStatus | null): boolean {
   return false
 }
 
+/**
+ * Alerts are subway-only — commuter-rail route IDs (LIRR/MNR) are bare
+ * numerics that can collide with subway route IDs in the shared alerts
+ * map (e.g. LIRR "4" vs subway 4 line), so this must check station.system,
+ * not just route-ID membership.
+ */
+export function shouldShowAlertToggle(
+  station: Station | null,
+  routeIds: string[],
+  alerts: Map<string, RouteAlert[]>
+): boolean {
+  if (!station || station.system) return false
+  return routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0)
+}
+
 // ── Auto-refresh ──
 
 export async function startAutoRefresh(): Promise<void> {
@@ -412,7 +429,7 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
             ...cachedArrivals.south.map(t => t.route),
           ]
         : []
-      const hasAlerts = routeIds.some(id => alerts.has(id) && (alerts.get(id)?.length ?? 0) > 0)
+      const hasAlerts = shouldShowAlertToggle(station, routeIds, alerts)
 
       if (hasAlerts && cachedArrivals) {
         isAlertView = !isAlertView

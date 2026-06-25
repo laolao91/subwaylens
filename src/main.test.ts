@@ -41,13 +41,14 @@ vi.mock('./glasses/stations', async () => {
 
 const {
   shouldSkipAutoRefresh,
+  shouldShowAlertToggle,
   startGlassesModeForTest,
   startAutoRefresh,
   stopAutoRefresh,
 } = await import('./main')
 
-function makeStation(id: string): Station {
-  return { id, name: id, stops: [], routes: [], lat: 0, lng: 0, north: '', south: '' }
+function makeStation(id: string, overrides: Partial<Station> = {}): Station {
+  return { id, name: id, stops: [], routes: [], lat: 0, lng: 0, north: '', south: '', ...overrides }
 }
 
 // DeviceStatus's real constructor backfills connectType to
@@ -130,6 +131,39 @@ describe('shouldSkipAutoRefresh', () => {
       isWearing: true,
     })
     expect(shouldSkipAutoRefresh(status)).toBe(false)
+  })
+})
+
+describe('shouldShowAlertToggle', () => {
+  it('returns true for a subway station with a route ID that has an active alert', () => {
+    const station = makeStation('times-sq')
+    const alerts = new Map([['4', [{ routeId: '4', headerText: 'Delays', effect: 8 }]]])
+    expect(shouldShowAlertToggle(station, ['4'], alerts)).toBe(true)
+  })
+
+  it('returns false for a subway station with no matching alerted route', () => {
+    const station = makeStation('times-sq')
+    const alerts = new Map([['4', [{ routeId: '4', headerText: 'Delays', effect: 8 }]]])
+    expect(shouldShowAlertToggle(station, ['N', 'Q', 'R'], alerts)).toBe(false)
+  })
+
+  it('returns false for an LIRR station even when its route ID numerically matches an alerted subway route ID', () => {
+    // Regression: LIRR "4" (Ronkonkoma) must not trigger the subway "4" line alert.
+    const station = makeStation('ronkonkoma', { system: 'lirr' })
+    const alerts = new Map([['4', [{ routeId: '4', headerText: 'Lexington Av delays', effect: 8 }]]])
+    expect(shouldShowAlertToggle(station, ['4'], alerts)).toBe(false)
+  })
+
+  it('returns false for an MNR station even when its route ID numerically matches an alerted subway route ID', () => {
+    // Same regression shape, Metro-North branch.
+    const station = makeStation('croton-harmon', { system: 'mnr' })
+    const alerts = new Map([['4', [{ routeId: '4', headerText: 'Lexington Av delays', effect: 8 }]]])
+    expect(shouldShowAlertToggle(station, ['4'], alerts)).toBe(false)
+  })
+
+  it('returns false when station is null (no crash)', () => {
+    const alerts = new Map([['4', [{ routeId: '4', headerText: 'Delays', effect: 8 }]]])
+    expect(shouldShowAlertToggle(null, ['4'], alerts)).toBe(false)
   })
 })
 
