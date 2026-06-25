@@ -39,6 +39,7 @@ import {
 import {
   renderHeader,
   renderBody,
+  renderDepartureBoard,
   renderAlertSummary,
   renderLoading,
   renderNoStations,
@@ -207,7 +208,9 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
   // then refresh in the background and update once fresh data arrives.
   if (cached) {
     const filtered = applyRouteFilter(cached, station.id)
-    const initialBody = renderBody(station, filtered, currentIndex, stations.length, alerts)
+    const initialBody = station.system
+      ? renderDepartureBoard(station, filtered)
+      : renderBody(station, filtered, currentIndex, stations.length, alerts)
     lastBodyText = initialBody
     if (useRebuild) {
       await rebuildPage(headerText, initialBody)
@@ -237,7 +240,9 @@ async function displayCurrentStation(useRebuild: boolean): Promise<void> {
     arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
     station.id
   )
-  const bodyText = renderBody(station, filtered, currentIndex, stations.length, freshAlerts)
+  const bodyText = station.system
+    ? renderDepartureBoard(station, filtered)
+    : renderBody(station, filtered, currentIndex, stations.length, freshAlerts)
   lastBodyText = bodyText
   await updateBody(bodyText)
 }
@@ -266,7 +271,9 @@ async function refreshInPlace(): Promise<void> {
       arrivals ?? { stationId: station.id, north: [], south: [], fetchedAt: Math.floor(Date.now() / 1000) },
       station.id
     )
-    const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts)
+    const bodyText = station.system
+      ? renderDepartureBoard(station, filtered)
+      : renderBody(station, filtered, currentIndex, stations.length, alerts)
     await updateHeader(renderHeader(station, isFavorite(station.id)))
     lastBodyText = bodyText
 
@@ -363,7 +370,9 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       const cached = getCachedArrivals(station.id)
       if (cached) {
         const filtered = applyRouteFilter(cached, station.id)
-        const bodyText = renderBody(station, filtered, currentIndex, stations.length, alerts)
+        const bodyText = station.system
+          ? renderDepartureBoard(station, filtered)
+          : renderBody(station, filtered, currentIndex, stations.length, alerts)
         lastBodyText = bodyText
         await updateBody(bodyText)
       }
@@ -457,7 +466,9 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
       if (!cached) return
       const { stations, currentIndex } = getState()
       const filtered = applyRouteFilter(cached, station.id)
-      const bodyText = renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
+      const bodyText = station.system
+        ? renderDepartureBoard(station, filtered)
+        : renderBody(station, filtered, currentIndex, stations.length, getCachedAlerts())
       lastBodyText = bodyText
       updateBody(bodyText)
     })
