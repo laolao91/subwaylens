@@ -36,6 +36,8 @@ export interface AppSettings {
   nearbyEnabled: boolean
   nearbyRadius: number     // miles (0.1, 0.25, 0.5, 1.0)
   hiddenRoutes: Record<string, string[]>  // stationId → route IDs to hide on glasses
+  showLaunchMenu: boolean  // true = show menu on every launch; false = skip to defaultView
+  defaultView: 'nearest' | 'favorites' | 'delays'  // starting view / menu pre-selection
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -43,4 +45,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   nearbyEnabled: true,
   nearbyRadius: 0.25,
   hiddenRoutes: {},
+  showLaunchMenu: true,
+  defaultView: 'favorites',
 }
+
+/** Top-level glasses display mode */
+export type AppMode = 'menu' | 'stations' | 'delays'
