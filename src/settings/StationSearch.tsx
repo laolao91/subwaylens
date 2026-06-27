@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { Button, Input } from 'even-toolkit/web'
 import { searchStations } from './search'
-import { RouteBadges } from './RouteBadge'
+import { RouteBadges, SystemBadge } from './RouteBadge'
 import type { Station } from '../lib/types'
 
 interface StationSearchProps {
@@ -65,7 +65,10 @@ export function StationSearch({ favoriteIds, onAdd }: StationSearchProps) {
               <div key={station.id} className="flex items-center gap-3 bg-surface p-4 border-b border-border last:border-b-0">
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] tracking-[-0.15px] text-text">{station.name}</div>
-                  <RouteBadges routes={station.routes} />
+                  {station.system
+                    ? <SystemBadge system={station.system} />
+                    : <RouteBadges routes={station.routes} />
+                  }
                 </div>
                 {isFav ? (
                   <span className="shrink-0 text-positive text-[17px] w-8 h-8 flex items-center justify-center">&#x2713;</span>

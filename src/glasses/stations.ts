@@ -90,21 +90,44 @@ export async function loadStations(): Promise<void> {
 }
 
 /**
- * Resolve GPS and append in-radius stations to the active list.
- * Skips favorites and anything already present (guards against a second
- * loadStations() racing a still-in-flight append). Notifies listeners
- * via 'subwaylens:stations-updated' only when the list actually grew.
+ * Resolve GPS, place the nearest station at position 0, then append any
+ * other in-radius non-favorite stations at the end.
+ *
+ * The nearest station is always first — even if it is already a favorite —
+ * so the glasses default to the closest stop on launch. Favorites retain
+ * their saved order behind it (no duplicates). Arrivals for the nearest
+ * station are prefetched immediately so the display is ready without a
+ * visible loading gap.
  */
 async function appendNearbyStations(radiusMiles: number): Promise<void> {
   const pos = await getCurrentPosition()
   if (!pos) return
   const nearby = nearbyStations(pos, allStations, radiusMiles)
-  const existing = new Set(state.stations.map((s) => s.id))
-  const additions = nearby
+  if (nearby.length === 0) return
+
+  const nearest = nearby[0].station
+
+  // Remaining nearby stations that aren't already in the list or favorites
+  const existingIds = new Set(state.stations.map((s) => s.id))
+  const otherNearby = nearby
+    .slice(1)
     .map(({ station }) => station)
-    .filter((s) => !state.favoriteIds.has(s.id) && !existing.has(s.id))
-  if (additions.length === 0) return
-  state.stations = [...state.stations, ...additions]
+    .filter((s) => !state.favoriteIds.has(s.id) && !existingIds.has(s.id))
+
+  // Nearest goes to position 0; remove it from wherever it sat (may be a
+  // favorite at a non-zero index) so it doesn't appear twice.
+  const withoutNearest = state.stations.filter((s) => s.id !== nearest.id)
+  state.stations = [nearest, ...withoutNearest, ...otherNearby]
+  state.currentIndex = 0
+
+  // Prefetch arrivals for the nearest station so display is instant.
+  try {
+    const arrivals = await dispatchGetArrivals(nearest)
+    state.arrivals.set(nearest.id, arrivals)
+  } catch {
+    // Silently skip — stale or empty cache is fine
+  }
+
   window.dispatchEvent(new CustomEvent('subwaylens:stations-updated'))
 }
 

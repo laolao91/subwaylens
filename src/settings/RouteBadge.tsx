@@ -45,3 +45,13 @@ export function RouteBadges({ routes }: RouteBadgesProps) {
     </div>
   )
 }
+
+export function SystemBadge({ system }: { system: 'lirr' | 'mnr' }) {
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      <span className="route-badge route-blue">
+        {system === 'mnr' ? 'MNR' : 'LIRR'}
+      </span>
+    </div>
+  )
+}

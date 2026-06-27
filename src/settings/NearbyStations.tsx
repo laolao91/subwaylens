@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from 'even-toolkit/web'
 import { getCurrentPositionDetailed, nearbyStations } from '../lib/geo'
-import { RouteBadges } from './RouteBadge'
+import { RouteBadges, SystemBadge } from './RouteBadge'
 import { allStations } from '../data/stations'
 import type { Station } from '../lib/types'
 
@@ -165,7 +165,10 @@ export function NearbyStations({ enabled, radius, favoriteIds, onAdd }: NearbySt
                   {distance.toFixed(2)} mi
                 </span>
               </div>
-              <RouteBadges routes={station.routes} />
+              {station.system
+                ? <SystemBadge system={station.system} />
+                : <RouteBadges routes={station.routes} />
+              }
             </div>
             {isFav ? (
               <span className="shrink-0 text-positive text-[17px] w-8 h-8 flex items-center justify-center">

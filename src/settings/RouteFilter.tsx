@@ -4,15 +4,20 @@
  * Hidden routes appear faded; active routes appear at full opacity.
  */
 
-import { routeColor } from './RouteBadge'
+import { routeColor, SystemBadge } from './RouteBadge'
 
 interface RouteFilterProps {
   routes: string[]
   hiddenRoutes: string[]
   onToggle: (route: string) => void
+  system?: 'lirr' | 'mnr'
 }
 
-export function RouteFilter({ routes, hiddenRoutes, onToggle }: RouteFilterProps) {
+export function RouteFilter({ routes, hiddenRoutes, onToggle, system }: RouteFilterProps) {
+  if (system === 'lirr' || system === 'mnr') {
+    return <SystemBadge system={system} />
+  }
+
   const hiddenSet = new Set(hiddenRoutes)
 
   return (

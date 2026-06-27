@@ -211,6 +211,7 @@ export function FavoritesList({ favoriteIds, hiddenRoutes, onReorder, onRemove, 
                   routes={station.routes}
                   hiddenRoutes={hiddenRoutes[station.id] ?? []}
                   onToggle={(route) => onToggleRoute(station.id, route)}
+                  system={station.system}
                 />
               </div>
               <button
