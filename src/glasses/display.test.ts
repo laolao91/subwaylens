@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { renderLoading, renderNoStations, formatDirectionLine, renderDepartureBoard } from './display'
+import { renderLoading, renderNoStations, formatDirectionLine, renderDepartureBoard, renderMenu, renderDelays } from './display'
 import type { Station, StationArrivals, TrainArrival } from '../lib/types'
+import type { RouteAlert } from '../data/alerts'
 
 // Note: renderHeader and renderBody require Station / StationArrivals objects
 // which pull in the full stations.json bundle. These pure-function tests cover
@@ -149,5 +150,96 @@ describe('renderDepartureBoard', () => {
       .filter(({ line }) => line.includes('Trk'))
     expect(trkLineIndexes[0].line).toContain('Trk 18') // 5min entry first
     expect(trkLineIndexes[1].line).toContain('Trk 15')
+  })
+})
+
+describe('renderMenu', () => {
+  it('highlights the cursor option with ▶', () => {
+    const out = renderMenu(1, true)
+    const lines = out.split('\n')
+    expect(lines.some(l => l.startsWith('▶') && l.includes('Favorites'))).toBe(true)
+    expect(lines.some(l => l.startsWith(' ') && l.includes('Nearest Station'))).toBe(true)
+    expect(lines.some(l => l.startsWith(' ') && l.includes('Delays'))).toBe(true)
+  })
+
+  it('dims Nearest Station when nearbyEnabled is false', () => {
+    const out = renderMenu(1, false)
+    expect(out).toContain('Nearest Station  (GPS off)')
+  })
+
+  it('footer says tap:enter dbl:exit', () => {
+    expect(renderMenu(0, true)).toContain('tap:enter')
+    expect(renderMenu(0, true)).toContain('dbl:exit')
+  })
+})
+
+describe('renderDelays', () => {
+  const now = 1700000000
+
+  it('shows No active alerts when alerts map is empty', () => {
+    const out = renderDelays(new Map(), [], now)
+    expect(out).toContain('No active alerts')
+  })
+
+  it('renders a service alert with route badge and header text', () => {
+    const alerts: Map<string, RouteAlert[]> = new Map([
+      ['R', [{ routeId: 'R', headerText: 'Minor delays systemwide', severity: 'WARNING' }]],
+    ])
+    const out = renderDelays(alerts, [], now)
+    expect(out).toContain('[R]')
+    expect(out).toContain('Minor delays systemwide')
+  })
+
+  it('shows delayed trains at stations above the 5-minute threshold', () => {
+    const station: Station = {
+      id: 'st1', name: 'DeKalb Av', stops: ['D24'], routes: ['B', 'Q'],
+      lat: 40.6, lng: -73.97, north: 'Manhattan', south: 'Brighton Beach',
+    }
+    const arrivals: StationArrivals = {
+      stationId: 'st1',
+      north: [{ route: 'B', direction: 'N', stopId: 'D24N', arrivalTime: now + 120, terminal: 'Bay Ridge', delay: 420 }],
+      south: [],
+      fetchedAt: now,
+    }
+    const out = renderDelays(new Map(), [{ station, arrivals, isNearby: false }], now)
+    expect(out).toContain('[B]')
+    expect(out).toContain('DeKalb Av')
+    expect(out).toContain('+7m late')
+  })
+
+  it('labels nearby stations with (nearby)', () => {
+    const station: Station = {
+      id: 'st2', name: 'Jackson Hts', stops: ['F12'], routes: ['F'],
+      lat: 40.74, lng: -73.89, north: 'Manhattan', south: 'Jamaica',
+    }
+    const arrivals: StationArrivals = {
+      stationId: 'st2',
+      north: [{ route: 'F', direction: 'N', stopId: 'F12N', arrivalTime: now + 60, terminal: 'Jamaica', delay: 360 }],
+      south: [],
+      fetchedAt: now,
+    }
+    const out = renderDelays(new Map(), [{ station, arrivals, isNearby: true }], now)
+    expect(out).toContain('(nearby)')
+  })
+
+  it('hides At your stations section when no train exceeds threshold', () => {
+    const station: Station = {
+      id: 'st3', name: 'Atlantic Av', stops: ['D24'], routes: ['R'],
+      lat: 40.68, lng: -73.97, north: 'Manhattan', south: 'Bay Ridge',
+    }
+    const arrivals: StationArrivals = {
+      stationId: 'st3',
+      north: [{ route: 'R', direction: 'N', stopId: 'D24N', arrivalTime: now + 300, terminal: 'Whitehall', delay: 60 }],
+      south: [],
+      fetchedAt: now,
+    }
+    const out = renderDelays(new Map(), [{ station, arrivals, isNearby: false }], now)
+    expect(out).not.toContain('At your stations')
+  })
+
+  it('footer says tap:refresh dbl:menu', () => {
+    const out = renderDelays(new Map(), [], now)
+    expect(out).toContain('tap:refresh')
+    expect(out).toContain('dbl:menu')
   })
 })

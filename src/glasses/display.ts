@@ -318,6 +318,104 @@ export function renderNoStations(): string {
   return lines.join('\n')
 }
 
+const MENU_OPTIONS = ['Nearest Station', 'Favorites', 'Delays'] as const
+
+/**
+ * Render the launch menu body.
+ * cursor: 0=Nearest, 1=Favorites, 2=Delays.
+ * When nearbyEnabled is false the Nearest option is shown as unselectable.
+ */
+export function renderMenu(cursor: number, nearbyEnabled: boolean): string {
+  const lines: string[] = []
+  lines.push('━'.repeat(DIVIDER_WIDTH))
+  MENU_OPTIONS.forEach((label, i) => {
+    const marker = i === cursor ? '▶' : ' '
+    if (i === 0 && !nearbyEnabled) {
+      lines.push(`${marker} Nearest Station  (GPS off)`)
+    } else {
+      lines.push(`${marker} ${label}`)
+    }
+  })
+  lines.push('━'.repeat(DIVIDER_WIDTH))
+  lines.push('scroll:select  tap:enter  dbl:exit')
+  return lines.join('\n')
+}
+
+/**
+ * Render the Delays view body.
+ *
+ * Top section: system-wide MTA service alerts (up to 4).
+ * Bottom section: trains running ≥5 min late at the user's stations.
+ * stationEntries: favorites + nearest non-favorite, each with cached arrivals
+ * and an isNearby flag that controls the "(nearby)" label.
+ */
+export function renderDelays(
+  alerts: Map<string, RouteAlert[]>,
+  stationEntries: Array<{ station: Station; arrivals: StationArrivals; isNearby: boolean }>,
+  now: number
+): string {
+  const lines: string[] = []
+  lines.push('! DELAYS & ALERTS')
+  lines.push('━'.repeat(DIVIDER_WIDTH))
+
+  const DELAY_THRESHOLD = 300
+
+  // ── Service alerts ──
+  const allAlerts = Array.from(alerts.values()).flat().slice(0, 4)
+  if (allAlerts.length === 0) {
+    lines.push('  No active alerts')
+  } else {
+    for (const alert of allAlerts) {
+      const badge = `[${alert.routeId}]`
+      const maxFirst = CHARS_PER_LINE - badge.length - 1
+      const header = alert.headerText
+      if (header.length <= maxFirst) {
+        lines.push(`${badge} ${header}`)
+      } else {
+        lines.push(`${badge} ${header.slice(0, maxFirst)}`)
+        const rest = header.slice(maxFirst)
+        const cont = rest.length > CHARS_PER_LINE - 4
+          ? rest.slice(0, CHARS_PER_LINE - 5) + '.'
+          : rest
+        lines.push(`    ${cont}`)
+      }
+    }
+  }
+
+  // ── Per-station delays (≥5 min) ──
+  const delayed: Array<{ route: string; label: string; delayMins: number }> = []
+  for (const { station, arrivals, isNearby } of stationEntries) {
+    const allTrains = [...arrivals.north, ...arrivals.south]
+    for (const train of allTrains) {
+      if ((train.delay ?? 0) >= DELAY_THRESHOLD) {
+        const stationLabel = isNearby ? `${station.name} (nearby)` : station.name
+        delayed.push({
+          route: train.route,
+          label: stationLabel,
+          delayMins: Math.round((train.delay ?? 0) / 60),
+        })
+      }
+    }
+  }
+
+  if (delayed.length > 0) {
+    lines.push('━'.repeat(DIVIDER_WIDTH))
+    lines.push('  At your stations:')
+    for (const d of delayed.slice(0, 6)) {
+      const badge = `[${d.route}]`
+      const text = `+${d.delayMins}m late`
+      const nameMax = CHARS_PER_LINE - badge.length - text.length - 4
+      const name = d.label.length > nameMax ? d.label.slice(0, nameMax - 1) + '.' : d.label
+      lines.push(`${badge} ${name}  ${text}`)
+    }
+  }
+
+  lines.push('━'.repeat(DIVIDER_WIDTH))
+  const fetchStr = formatClockTime(new Date(now * 1000))
+  lines.push(`${fetchStr}  tap:refresh  dbl:menu`)
+  return lines.join('\n')
+}
+
 /**
  * Abbreviate a branch/route display name to a compact badge.
  * Multi-word: first letter + first 3 of second word ("Port Jefferson" → "PJEF").
