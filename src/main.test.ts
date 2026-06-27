@@ -45,6 +45,8 @@ const {
   startGlassesModeForTest,
   startAutoRefresh,
   stopAutoRefresh,
+  resolveInitialMode,
+  resolveMenuCursor,
 } = await import('./main')
 
 function makeStation(id: string, overrides: Partial<Station> = {}): Station {
@@ -302,5 +304,29 @@ describe('startAutoRefresh timer gating', () => {
     await vi.advanceTimersByTimeAsync(30_000)
 
     expect(stations.refreshCurrentArrivals).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('resolveInitialMode', () => {
+  it('returns menu when showLaunchMenu is true', () => {
+    expect(resolveInitialMode({ showLaunchMenu: true, defaultView: 'favorites' })).toBe('menu')
+  })
+  it('returns stations for nearest/favorites defaultView when showLaunchMenu is false', () => {
+    expect(resolveInitialMode({ showLaunchMenu: false, defaultView: 'nearest' })).toBe('stations')
+    expect(resolveInitialMode({ showLaunchMenu: false, defaultView: 'favorites' })).toBe('stations')
+  })
+  it('returns delays when showLaunchMenu is false and defaultView is delays', () => {
+    expect(resolveInitialMode({ showLaunchMenu: false, defaultView: 'delays' })).toBe('delays')
+  })
+})
+
+describe('resolveMenuCursor', () => {
+  it('maps defaultView to cursor index', () => {
+    expect(resolveMenuCursor('nearest', true)).toBe(0)
+    expect(resolveMenuCursor('favorites', true)).toBe(1)
+    expect(resolveMenuCursor('delays', true)).toBe(2)
+  })
+  it('falls back to favorites (1) when defaultView is nearest but GPS is off', () => {
+    expect(resolveMenuCursor('nearest', false)).toBe(1)
   })
 })

@@ -22,7 +22,7 @@ import {
 import type { EvenAppBridge, DeviceStatus } from '@evenrealities/even_hub_sdk'
 
 import { initStorage } from './lib/storage'
-import type { Station } from './lib/types'
+import type { Station, StationArrivals, AppMode, AppSettings } from './lib/types'
 import type { RouteAlert } from './data/alerts'
 import {
   loadStations,
@@ -45,6 +45,8 @@ import {
   renderAlertSummary,
   renderLoading,
   renderNoStations,
+  renderMenu,
+  renderDelays,
 } from './glasses/display'
 import { setupInput } from './glasses/input'
 import { getSettings } from './lib/storage'
@@ -80,6 +82,11 @@ let displaySeq = 0
 // Prevents concurrent auto-refreshes from overlapping if a fetch takes
 // longer than the configured interval.
 let isRefreshing = false
+
+// ── App mode state ──
+let appMode: AppMode = 'menu'
+let menuCursor = 1          // 0=Nearest, 1=Favorites, 2=Delays
+let nearbyEnabledCache = true  // cached for menu rendering without re-reading settings
 
 // ── Glasses display helpers ──
 
@@ -351,6 +358,67 @@ export function stopAutoRefresh(): void {
   }
 }
 
+/**
+ * Determine the initial glasses mode from settings.
+ * Pure function — no side effects, exported for testing.
+ */
+export function resolveInitialMode(
+  settings: Pick<AppSettings, 'showLaunchMenu' | 'defaultView'>
+): AppMode {
+  if (settings.showLaunchMenu) return 'menu'
+  return settings.defaultView === 'delays' ? 'delays' : 'stations'
+}
+
+/**
+ * Map defaultView to a menu cursor index (0=Nearest, 1=Favorites, 2=Delays).
+ * Falls back to Favorites when Nearest is requested but GPS is off.
+ */
+export function resolveMenuCursor(
+  defaultView: 'nearest' | 'favorites' | 'delays',
+  nearbyEnabled: boolean
+): number {
+  if (defaultView === 'nearest') return nearbyEnabled ? 0 : 1
+  if (defaultView === 'delays') return 2
+  return 1
+}
+
+async function showMenu(useRebuild: boolean): Promise<void> {
+  appMode = 'menu'
+  const body = renderMenu(menuCursor, nearbyEnabledCache)
+  if (useRebuild) {
+    await rebuildPage('SUBWAYLENS', body)
+  } else {
+    await updateHeader('SUBWAYLENS')
+    await updateBody(body)
+  }
+}
+
+async function showDelays(useRebuild: boolean): Promise<void> {
+  appMode = 'delays'
+  const now = Math.floor(Date.now() / 1000)
+  const { stations, favoriteIds, arrivals } = getState()
+  const alerts = getCachedAlerts()
+
+  const nearestNonFav = stations.find(s => !favoriteIds.has(s.id)) ?? null
+  const stationEntries: Array<{ station: Station; arrivals: StationArrivals; isNearby: boolean }> = []
+  for (const s of stations.filter(s => favoriteIds.has(s.id))) {
+    const a = arrivals.get(s.id)
+    if (a) stationEntries.push({ station: s, arrivals: a, isNearby: false })
+  }
+  if (nearestNonFav) {
+    const a = arrivals.get(nearestNonFav.id)
+    if (a) stationEntries.push({ station: nearestNonFav, arrivals: a, isNearby: true })
+  }
+
+  const body = renderDelays(alerts, stationEntries, now)
+  if (useRebuild) {
+    await rebuildPage('! DELAYS', body)
+  } else {
+    await updateHeader('! DELAYS')
+    await updateBody(body)
+  }
+}
+
 // ── Shared background/disconnect handler ──
 // onForegroundExit and onAbnormalExit perform identical cleanup.
 function handleBackground(): void {
@@ -362,41 +430,56 @@ function handleBackground(): void {
 
 async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   bridge = b
-
   initStorage(b)
+
+  const settings = await getSettings()
+  nearbyEnabledCache = settings.nearbyEnabled
+  menuCursor = resolveMenuCursor(settings.defaultView, settings.nearbyEnabled)
+  appMode = resolveInitialMode(settings)
 
   await loadStations()
 
   const station = currentStation()
-  if (station) {
-    await createInitialPage(
-      renderHeader(station, isFavorite(station.id)),
-      renderLoading()
-    )
+
+  // ── Initial page ──
+  if (appMode === 'menu') {
+    await createInitialPage('SUBWAYLENS', renderMenu(menuCursor, nearbyEnabledCache))
+  } else if (appMode === 'delays') {
+    await createInitialPage('! DELAYS', renderLoading())
   } else {
-    await createInitialPage('SubwayLens', renderNoStations())
+    if (station) {
+      await createInitialPage(
+        renderHeader(station, isFavorite(station.id)),
+        renderLoading()
+      )
+    } else {
+      await createInitialPage('SubwayLens', renderNoStations())
+    }
   }
 
+  // ── Warm cache ──
   if (station) {
-    // Warm the cache for all favorites in parallel, then paint from cache.
     const seq = ++displaySeq
     await Promise.all([prefetchAllStations(), refreshAlerts()])
     if (displaySeq === seq) {
-      const { stations, currentIndex } = getState()
-      const alerts = getCachedAlerts()
-      const cached = getCachedArrivals(station.id)
-      if (cached) {
-        const filtered = applyRouteFilter(cached, station.id)
-        const bodyText = station.system
-          ? renderDepartureBoard(station, filtered)
-          : renderBody(station, filtered, currentIndex, stations.length, alerts)
-        lastBodyText = bodyText
-        await updateBody(bodyText)
+      if (appMode === 'stations') {
+        const { stations, currentIndex } = getState()
+        const alerts = getCachedAlerts()
+        const cached = getCachedArrivals(station.id)
+        if (cached) {
+          const filtered = applyRouteFilter(cached, station.id)
+          const bodyText = station.system
+            ? renderDepartureBoard(station, filtered)
+            : renderBody(station, filtered, currentIndex, stations.length, alerts)
+          lastBodyText = bodyText
+          await updateBody(bodyText)
+        }
+      } else if (appMode === 'delays') {
+        await showDelays(false)
       }
     }
   }
 
-  // Store the unsub handle so re-entry is safe (teardown before re-registering).
   if (deviceStatusUnsub) deviceStatusUnsub()
   deviceStatusUnsub = b.onDeviceStatusChanged((status) => {
     lastDeviceStatus = status
@@ -406,58 +489,92 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   inputUnsub = setupInput(b, {
 
     onScrollDown: async () => {
-      nextStation()
-      await displayCurrentStation(true)
+      if (appMode === 'menu') {
+        menuCursor = (menuCursor + 1) % 3
+        await updateBody(renderMenu(menuCursor, nearbyEnabledCache))
+      } else if (appMode === 'stations') {
+        nextStation()
+        await displayCurrentStation(true)
+      }
+      // delays mode: no scroll action (single-page view)
     },
 
     onScrollUp: async () => {
-      prevStation()
-      await displayCurrentStation(true)
+      if (appMode === 'menu') {
+        menuCursor = (menuCursor - 1 + 3) % 3
+        await updateBody(renderMenu(menuCursor, nearbyEnabledCache))
+      } else if (appMode === 'stations') {
+        prevStation()
+        await displayCurrentStation(true)
+      }
     },
 
     onTap: async () => {
-      const station = currentStation()
-      const cachedArrivals = station
-        ? getCachedArrivals(station.id)
-        : null
-      const alerts = getCachedAlerts()
-
-      // Check if any routes at this station have active alerts
-      const routeIds = cachedArrivals
-        ? [
-            ...cachedArrivals.north.map(t => t.route),
-            ...cachedArrivals.south.map(t => t.route),
-          ]
-        : []
-      const hasAlerts = shouldShowAlertToggle(station, routeIds, alerts)
-
-      if (hasAlerts && cachedArrivals) {
-        isAlertView = !isAlertView
-        if (isAlertView) {
-          await updateBody(renderAlertSummary(cachedArrivals, alerts))
+      if (appMode === 'menu') {
+        if (menuCursor === 0 && !nearbyEnabledCache) return
+        if (menuCursor === 2) {
+          await showDelays(true)
         } else {
-          await updateBody(lastBodyText)
+          appMode = 'stations'
+          await displayCurrentStation(true)
         }
+        await startAutoRefresh()
+      } else if (appMode === 'delays') {
+        await Promise.all([prefetchAllStations(), refreshAlerts()])
+        await showDelays(false)
       } else {
-        isAlertView = false
-        await refreshInPlace()
+        // stations mode — existing tap logic
+        const station = currentStation()
+        const cachedArrivals = station ? getCachedArrivals(station.id) : null
+        const alerts = getCachedAlerts()
+        const routeIds = cachedArrivals
+          ? [...cachedArrivals.north.map(t => t.route), ...cachedArrivals.south.map(t => t.route)]
+          : []
+        const hasAlerts = shouldShowAlertToggle(station, routeIds, alerts)
+        if (hasAlerts && cachedArrivals) {
+          isAlertView = !isAlertView
+          if (isAlertView) {
+            await updateBody(renderAlertSummary(cachedArrivals, alerts))
+          } else {
+            await updateBody(lastBodyText)
+          }
+        } else {
+          isAlertView = false
+          await refreshInPlace()
+        }
       }
     },
 
     onDoubleTap: async () => {
-      stopAutoRefresh()
-      await b.shutDownPageContainer(1)
+      if (appMode === 'menu') {
+        stopAutoRefresh()
+        await b.shutDownPageContainer(1)
+      } else {
+        stopAutoRefresh()
+        isAlertView = false
+        await showMenu(true)
+      }
     },
 
     onForegroundEnter: () => {
       isAlertView = false
-      loadStations().then(() => {
-        // Warm cache for all stations before displaying, then display current.
-        Promise.all([prefetchAllStations(), refreshAlerts()]).then(() =>
-          displayCurrentStation(true)
-        )
+      getSettings().then((s) => {
+        nearbyEnabledCache = s.nearbyEnabled
+        menuCursor = resolveMenuCursor(s.defaultView, s.nearbyEnabled)
+        appMode = resolveInitialMode(s)
+        loadStations().then(() => {
+          Promise.all([prefetchAllStations(), refreshAlerts()]).then(() => {
+            if (appMode === 'menu') {
+              showMenu(true)
+            } else if (appMode === 'delays') {
+              showDelays(true)
+            } else {
+              displayCurrentStation(true)
+            }
+          })
+        })
+        startAutoRefresh()
       })
-      startAutoRefresh()
     },
 
     onForegroundExit: handleBackground,
@@ -468,13 +585,13 @@ async function startGlassesMode(b: EvenAppBridge): Promise<void> {
   await startAutoRefresh()
 
   window.addEventListener('subwaylens:sync', () => {
-    loadStations().then(() => displayCurrentStation(true))
+    loadStations().then(() => {
+      if (appMode === 'stations') displayCurrentStation(true)
+    })
   })
 
-  // Nearby stations resolved in the background (GPS append) — prefetch
-  // their arrivals, then re-render from cache so the progress bar picks
-  // up the new station count. Light-touch: no nav reset, no alert-view exit.
   window.addEventListener('subwaylens:stations-updated', () => {
+    if (appMode !== 'stations') return
     prefetchAllStations().then(() => {
       if (isAlertView) return
       const station = currentStation()
