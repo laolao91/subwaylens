@@ -183,7 +183,7 @@ describe('renderDelays', () => {
 
   it('renders a service alert with route badge and header text', () => {
     const alerts: Map<string, RouteAlert[]> = new Map([
-      ['R', [{ routeId: 'R', headerText: 'Minor delays systemwide', severity: 'WARNING' }]],
+      ['R', [{ routeId: 'R', headerText: 'Minor delays systemwide', effect: 8 }]],
     ])
     const out = renderDelays(alerts, [], now)
     expect(out).toContain('[R]')
