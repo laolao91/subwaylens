@@ -1,6 +1,6 @@
 {
   "name": "subwaylens",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,10 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.11",
+    "@evenrealities/even_hub_sdk": "^0.0.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "even-toolkit": "^1.7.0",
+    "even-toolkit": "^1.7.7",
     "gtfs-realtime-bindings": "^1.1.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -22,8 +22,8 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
-    "@evenrealities/evenhub-cli": "^0.1.12",
-    "@evenrealities/evenhub-simulator": "^0.6.2",
+    "@evenrealities/evenhub-cli": "^0.1.13",
+    "@evenrealities/evenhub-simulator": "^0.8.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -51,6 +51,8 @@ For testing builds before a release, use pre-release identifiers:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.1.0 | 2026-07-18 | Toolchain maintenance: SDK 0.0.12, CLI 0.1.13, simulator 0.8.0, even-toolkit 1.7.7. Fixed a pre-existing `app.json` whitelist gap (missing `react.dev`, same rejection class as Wander v1.10). No user-facing changes. |
+| 2.0.0 *(gap)* | 2026-06-27 | *(Table rows for 1.9.0 and 2.0.0 were never backfilled by prior sessions — not reconstructed here either, out of scope for this release. See git log at `c343b94` and project memory for what shipped.)* |
 | 1.8.1 | 2026-06-22 | Based on v1.6.2 (not the v1.7.x feature branch). Fixed Android location-permission failures by switching to the SDK's native `getAppLocation()` bridge call, with `navigator.geolocation` fallback. SDK bumped to 0.0.11 (requires Even Hub app 2.2.5+). |
 | 1.6.2 | 2026-06-09 | Favorites display no longer blocks on GPS. |
 | 1.6.1 | 2026-06-09 | Snapshot of submitted build. |

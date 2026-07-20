@@ -1,3 +1,32 @@
+## v2.1.0 — 2026-07-18
+
+Toolchain maintenance release, branched from `v2.0.0` (commit `c343b94`) rather than the
+sibling `SubwayLens_v2.0.1/` folder — that folder has no git history and was never
+reconciled (see `SubwayLens_v2.1_Research.md`). No user-facing feature changes.
+
+### Dependencies
+
+- `@evenrealities/even_hub_sdk` 0.0.11 → 0.0.12
+- `even-toolkit` 1.7.0 → 1.7.7
+- `@evenrealities/evenhub-cli` 0.1.12 → 0.1.13
+- `@evenrealities/evenhub-simulator` 0.6.2 → 0.8.0
+
+SDK 0.0.12 adds an optional `zOrderIndex` (container stacking order) and moves image
+raw data to internal LZ4 compression. Neither applies here: SubwayLens's glasses screens
+only ever render 2 non-overlapping text containers (`src/main.ts`), and the app has no
+image-container usage at all — checked directly, no `ImageContainerProperty` /
+`updateImageRawData` calls anywhere in `src/`.
+
+### Fixed
+
+- **`app.json` network whitelist missing `react.dev`** — the built bundle contains
+  React's minified-error-message URL (`react.dev/errors/...`), a static string in
+  `vendor-react-*.js`, never actually fetched, but caught by the store's static bundle
+  scanner regardless (the same rejection class documented in
+  `EVEN_HUB_SUBMISSION_CHECKLIST.md` and previously hit by Wander v1.10). This was a
+  latent, pre-existing gap unrelated to the SDK bump — confirmed present in the current
+  `v2.0.0` build too, not something this update introduced.
+
 ## v1.8.1 — 2026-06-22
 
 Dependency/bug fix release, based on v1.6.2 (the layout/feel users know from the live Even Hub listing — the v1.7.x feature branch is not included).
